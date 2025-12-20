@@ -50,13 +50,27 @@
       align-items: center;
     }
 
+    button, select, input[type="checkbox"] {
+      font-size: 15px;
+    }
+
     button, select {
       padding: 10px 12px;
-      font-size: 15px;
       border-radius: 999px;
       border: 1px solid var(--border);
       background: rgba(255,255,255,0.65);
       cursor: pointer;
+    }
+
+    label.chk {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.45);
+      user-select: none;
     }
 
     .hint { opacity: 0.75; font-size: 13px; margin-top: 8px; }
@@ -103,54 +117,77 @@
         <option value="no" selected>No</option>
       </select>
     </label>
+
+    <label class="chk" title="Recommended: Decode auto-detects per word (works even if sender used different settings)">
+      <input id="smartDecode" type="checkbox" checked />
+      Smart Decode
+    </label>
   </div>
 
   <textarea id="output" readonly></textarea>
 
   <div class="hint">
-    How Fliplish works:
-Each word is encoded by moving the first one or two letters to the end of the word and then adding a suffix.
-To decode, the suffix is removed and those letters are moved back to the front, restoring the original word.
-Punctuation, spacing, and contractions (like I’m or don’t) are preserved so the text stays readable.
+    How Fliplish works: Each word is encoded by moving the first one or two letters to the end of the word and then adding a suffix.
+    To decode, the suffix is removed and those letters are moved back to the front, restoring the original word.
+    Punctuation, spacing, and contractions (like I’m or don’t) are preserved so the text stays readable.
   </div>
 </div>
 
 <script>
-const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+/** ====== Suffixes ====== **/
+const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
+const EXTRA_SUFFIXES = ["sh", "ch", "th"]; // shown first
+const ALL_SUFFIXES = [...EXTRA_SUFFIXES, ...LETTERS];
 
+/** ====== Elements ====== **/
 const inputEl = document.getElementById("input");
 const outputEl = document.getElementById("output");
 const suffixEl = document.getElementById("suffix");
 const suffixModeEl = document.getElementById("suffixMode");
 const moveNEl = document.getElementById("moveN");
 const capsEl = document.getElementById("caps");
+const smartDecodeEl = document.getElementById("smartDecode");
 
-/* ✅ Suffix dropdown: SH/CH/TH first, then a–z */
+/** ====== Init suffix dropdown (SH/CH/TH then A-Z) ====== **/
 (function initSuffix() {
-  const special = ["sh", "ch", "th"];
-  const all = [...special, ...LETTERS.split("")];
-
   suffixEl.innerHTML = "";
-  for (const s of all) {
+  for (const s of ALL_SUFFIXES) {
     const o = document.createElement("option");
     o.value = s;
-    o.textContent = s.toUpperCase(); // looks nicer in the UI
-    if (s === "a") o.selected = true; // default stays "a"
+    o.textContent = s.toUpperCase();
+    if (s === "a") o.selected = true;
     suffixEl.appendChild(o);
   }
 })();
 
+/** Disable manual suffix picker in AEO/Random mode */
+function syncSuffixUI() {
+  const mode = suffixModeEl.value;
+  const disabled = (mode === "aeo" || mode === "random");
+  suffixEl.disabled = disabled;
+  suffixEl.style.opacity = disabled ? "0.55" : "1";
+}
+suffixModeEl.addEventListener("change", syncSuffixUI);
+syncSuffixUI();
+
+/** ====== Tokenizer ======
+  Keeps words together and preserves punctuation.
+  Also keeps apostrophes inside words (I'm, don't) as part of the token.
+**/
 function tokenize(text) {
   return text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*|[^A-Za-z]+/g) || [];
 }
 
 function detectCapsStyle(word) {
   if (word === word.toUpperCase()) return "upper";
-  if (word[0] === word[0].toUpperCase()) return "title";
+  if (word[0] === word[0].toUpperCase() && word.slice(1) === word.slice(1).toLowerCase()) return "title";
   return "lower";
 }
 
-/* 🔒 Apostrophe-safe helpers */
+/** ====== Apostrophe-safe helpers ======
+  We do the letter-moving on letters only, then re-insert apostrophes
+  at their original indices so contractions stay like I'm (not 'im).
+**/
 function splitApostrophes(word) {
   const letters = [];
   const apos = [];
@@ -163,20 +200,23 @@ function splitApostrophes(word) {
 
 function restoreApostrophes(word, apos) {
   const arr = [...word];
-  apos.forEach(({ i, c }) => arr.splice(i, 0, c));
+  apos.forEach(({ i, c }) => {
+    const idx = Math.max(0, Math.min(i, arr.length));
+    arr.splice(idx, 0, c);
+  });
   return arr.join("");
 }
 
+/** ====== Core encode/decode ====== **/
 function encodeWord(word, suffix, preserveCaps, moveN) {
   const style = preserveCaps ? detectCapsStyle(word) : "lower";
   const lower = word.toLowerCase();
   const { letters, apos } = splitApostrophes(lower);
-
   if (!letters) return word;
 
   const n = Math.min(moveN, letters.length);
-  let coded = letters.slice(n) + letters.slice(0, n) + suffix;
-  coded = restoreApostrophes(coded, apos);
+  let codedLetters = letters.slice(n) + letters.slice(0, n) + suffix;
+  let coded = restoreApostrophes(codedLetters, apos);
 
   if (!preserveCaps) return coded;
   if (style === "upper") return coded.toUpperCase();
@@ -187,16 +227,15 @@ function encodeWord(word, suffix, preserveCaps, moveN) {
 function decodeWord(word, suffix, preserveCaps, moveN) {
   const style = preserveCaps ? detectCapsStyle(word) : "lower";
   const lower = word.toLowerCase();
-
-  /* ✅ handles 1-char or 2-char suffix */
   if (!lower.endsWith(suffix)) return word;
 
   const core = lower.slice(0, -suffix.length);
   const { letters, apos } = splitApostrophes(core);
+  if (!letters) return word;
 
   const n = Math.min(moveN, letters.length);
-  let plain = letters.slice(-n) + letters.slice(0, -n);
-  plain = restoreApostrophes(plain, apos);
+  let plainLetters = letters.slice(-n) + letters.slice(0, -n);
+  let plain = restoreApostrophes(plainLetters, apos);
 
   if (!preserveCaps) return plain;
   if (style === "upper") return plain.toUpperCase();
@@ -204,55 +243,119 @@ function decodeWord(word, suffix, preserveCaps, moveN) {
   return plain;
 }
 
+/** ====== Suffix selection ====== **/
 function randomSuffix() {
-  return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  return ALL_SUFFIXES[Math.floor(Math.random() * ALL_SUFFIXES.length)];
 }
 
 function getSuffixForWord(i) {
-  if (suffixModeEl.value === "aeo") return ["a","e","o"][i % 3];
-  if (suffixModeEl.value === "random") return randomSuffix();
-  return suffixEl.value; // single (can be sh/ch/th or a–z)
+  const mode = suffixModeEl.value;
+  if (mode === "aeo") return ["a","e","o"][i % 3];
+  if (mode === "random") return randomSuffix();
+  return suffixEl.value; // single
 }
 
-/* ✅ for Random decode only (still 1-letter random) */
-function lastCharSuffix(w) {
-  const c = w[w.length - 1];
-  return /[a-z]/i.test(c) ? c.toLowerCase() : null;
+/** Pull suffix from a token (supports 2-letter suffixes SH/CH/TH) */
+function suffixFromToken(tok) {
+  const low = tok.toLowerCase();
+  // prefer longest match first
+  for (const s of EXTRA_SUFFIXES) {
+    if (low.endsWith(s)) return s;
+  }
+  // fallback 1-letter
+  const last = low[low.length - 1] || "";
+  return /[a-z]/.test(last) ? last : null;
 }
 
+/** ====== Smart Decode ======
+  Try moveN=1 and moveN=2 (using the suffix found on the word)
+  and pick the result that "looks most like a real word".
+**/
+function scorePlainWord(w) {
+  // Score based on being pronounceable-ish.
+  // (No dictionaries needed; this is lightweight and fast.)
+  const low = w.toLowerCase();
+  const lettersOnly = low.replace(/[^a-z]/g, "");
+  if (lettersOnly.length === 0) return -999;
+
+  // Reward vowels; penalize long vowelless strings
+  const vowels = (lettersOnly.match(/[aeiouy]/g) || []).length;
+  const len = lettersOnly.length;
+
+  let score = 0;
+  score += vowels * 2;
+  if (len >= 4 && vowels === 0) score -= 8;
+  if (len >= 6 && vowels <= 1) score -= 5;
+
+  // Penalize ugly clusters / rare letters spam
+  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;
+  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 6; // 5 consonants in a row
+
+  // Light reward for common English-ish endings
+  if (/(ing|ed|ly|tion|s)$/.test(lettersOnly)) score += 2;
+
+  // Slight reward if contraction apostrophe looks normal (I'm, don't)
+  if (low.includes("'") || low.includes("’")) {
+    if (/^[a-z]('’)[a-z]/.test(low)) score += 2;
+    if (/^('’)/.test(low)) score -= 6; // bad: starts with apostrophe
+  }
+
+  return score;
+}
+
+function smartDecodeToken(tok, preserveCaps) {
+  const sfx = suffixFromToken(tok);
+  if (!sfx) return tok;
+
+  const cand1 = decodeWord(tok, sfx, preserveCaps, 1);
+  const cand2 = decodeWord(tok, sfx, preserveCaps, 2);
+
+  const sc1 = scorePlainWord(cand1);
+  const sc2 = scorePlainWord(cand2);
+
+  // If one clearly wins, choose it.
+  if (sc2 > sc1 + 1) return cand2;
+  if (sc1 > sc2 + 1) return cand1;
+
+  // Tie-breaker: use UI moveN if they’re close
+  const uiN = parseInt(moveNEl.value, 10);
+  return uiN === 2 ? cand2 : cand1;
+}
+
+/** ====== Transform ====== **/
 function transform(text, mode) {
   const preserveCaps = capsEl.value === "yes";
-  const moveN = +moveNEl.value;
   let wordIndex = 0;
 
   return tokenize(text).map(tok => {
     if (/^[A-Za-z]/.test(tok)) {
-      let suffix;
-
-      if (mode === "decode") {
-        if (suffixModeEl.value === "random") {
-          // random decode: suffix is whatever last letter is
-          suffix = lastCharSuffix(tok) || "a";
-        } else if (suffixModeEl.value === "aeo") {
-          // aeo decode: suffix is based on word index
-          suffix = ["a","e","o"][wordIndex % 3];
-        } else {
-          // single decode: use selected suffix (supports SH/CH/TH)
-          suffix = suffixEl.value;
-        }
+      if (mode === "encode") {
+        const moveN = +moveNEl.value;
+        const suffix = getSuffixForWord(wordIndex);
+        wordIndex++;
+        return encodeWord(tok, suffix, preserveCaps, moveN);
       } else {
-        suffix = getSuffixForWord(wordIndex);
-      }
+        // DECODE
+        const useSmart = smartDecodeEl.checked;
 
-      wordIndex++;
-      return mode === "encode"
-        ? encodeWord(tok, suffix, preserveCaps, moveN)
-        : decodeWord(tok, suffix, preserveCaps, moveN);
+        if (useSmart) {
+          // Ignores UI settings: figures it out per word.
+          wordIndex++;
+          return smartDecodeToken(tok, preserveCaps);
+        }
+
+        // Manual decode (old behavior)
+        const moveN = +moveNEl.value;
+        const suffix = suffixFromToken(tok) || getSuffixForWord(wordIndex);
+        wordIndex++;
+        return decodeWord(tok, suffix, preserveCaps, moveN);
+      }
     }
     return tok;
   }).join("");
 }
 
+/** ====== Buttons ====== **/
 document.getElementById("encode").onclick = () =>
   outputEl.value = transform(inputEl.value, "encode");
 
@@ -262,6 +365,7 @@ document.getElementById("decode").onclick = () =>
 document.getElementById("clear").onclick = () => {
   inputEl.value = "";
   outputEl.value = "";
+  inputEl.focus();
 };
 </script>
 </body>
