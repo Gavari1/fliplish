@@ -85,6 +85,7 @@
         <select id="suffixMode">
           <option value="single" selected>Single</option>
           <option value="aeo">AEO Rotate</option>
+          <option value="random">Random</option>
         </select>
       </label>
 
@@ -93,7 +94,6 @@
         <select id="suffix"></select>
       </label>
 
-      <!-- ✅ NEW: Move 1 or 2 letters -->
       <label>
         Move letters:
         <select id="moveN">
@@ -128,12 +128,13 @@
   const capsEl = document.getElementById("caps");
   const clearBtn = document.getElementById("clear");
 
+  const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
   // Populate suffix dropdown with a–z (default = a)
   (function initSuffixOptions() {
-    const letters = "abcdefghijklmnopqrstuvwxyz";
     const defaultSuffix = "a";
     suffixEl.innerHTML = "";
-    for (const ch of letters) {
+    for (const ch of LETTERS) {
       const opt = document.createElement("option");
       opt.value = ch;
       opt.textContent = ch;
@@ -142,11 +143,12 @@
     }
   })();
 
-  // (Optional UX) Disable manual suffix picker when in AEO mode
+  // Disable manual suffix picker when in AEO or Random mode
   function syncSuffixUI() {
     const mode = suffixModeEl.value;
-    suffixEl.disabled = (mode === "aeo");
-    suffixEl.style.opacity = (mode === "aeo") ? "0.55" : "1";
+    const disabled = (mode === "aeo" || mode === "random");
+    suffixEl.disabled = disabled;
+    suffixEl.style.opacity = disabled ? "0.55" : "1";
   }
   suffixModeEl.addEventListener("change", syncSuffixUI);
   syncSuffixUI();
@@ -168,9 +170,7 @@
     const w = word.toLowerCase();
     if (w.length < 1) return word;
 
-    // If word is shorter than moveN, just move the whole word (keeps it stable)
     const n = Math.min(moveN, w.length);
-
     const head = w.slice(0, n);
     const rest = w.slice(n);
     let coded = rest + head + suffix;
@@ -179,10 +179,8 @@
 
     if (style === "upper") return coded.toUpperCase();
 
-    // For Title Case: keep the ORIGINAL first letter capital, wherever it ends up
     if (style === "title") {
-      // Original first letter ends up at: rest.length (start of head in coded) + (0 offset)
-      const idx = rest.length; // first char of head in coded
+      const idx = rest.length; // where original first letter ended up
       coded =
         coded.slice(0, idx) +
         coded[idx].toUpperCase() +
@@ -217,13 +215,27 @@
     return plain;
   }
 
+  function randomSuffix() {
+    return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  }
+
+  // Picks suffix per word depending on mode (ENCODE side)
   function getSuffixForWord(wordIndex) {
     const mode = suffixModeEl.value;
     if (mode === "aeo") {
       const cycle = ["a", "e", "o"];
       return cycle[wordIndex % cycle.length];
     }
-    return suffixEl.value;
+    if (mode === "random") {
+      return randomSuffix();
+    }
+    return suffixEl.value; // single
+  }
+
+  function lastCharSuffix(tok) {
+    const last = tok[tok.length - 1] || "";
+    const low = last.toLowerCase();
+    return /[a-z]/.test(low) ? low : null;
   }
 
   function transform(text, mode) {
@@ -234,10 +246,19 @@
     let wordIndex = 0;
     const out = tokens.map(tok => {
       if (/^[A-Za-z]/.test(tok)) {
-        const suffix = getSuffixForWord(wordIndex);
+        let suffix;
+
+        if (mode === "decode") {
+          // ✅ decode uses the actual suffix on the word (supports Random automatically)
+          suffix = lastCharSuffix(tok) || getSuffixForWord(wordIndex);
+        } else {
+          suffix = getSuffixForWord(wordIndex);
+        }
+
         const result = (mode === "encode")
           ? encodeWord(tok, suffix, preserveCaps, moveN)
           : decodeWord(tok, suffix, preserveCaps, moveN);
+
         wordIndex++;
         return result;
       }
