@@ -13,12 +13,25 @@
       --text: #111827;
     }
 
+    /* ✅ Mobile-safe sizing so 100% widths don't overflow */
+    * { box-sizing: border-box; }
+
+    /* ✅ Prevent tiny horizontal scroll on iOS Safari */
+    html, body { overflow-x: hidden; }
+
     body {
       font-family: system-ui, -apple-system, Segoe UI, sans-serif;
       margin: 24px;
       line-height: 1.35;
       background: var(--bg);
       color: var(--text);
+    }
+
+    /* ✅ Center the whole app on mobile + desktop */
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      width: 100%;
     }
 
     textarea {
@@ -60,181 +73,183 @@
 </head>
 
 <body>
-  <h1>Fliplish Translator</h1>
+  <div class="container">
+    <h1>Fliplish Translator</h1>
 
-  <label for="input">Input</label>
-  <textarea id="input" placeholder="Type English (or coded text) here..."></textarea>
+    <label for="input">Input</label>
+    <textarea id="input" placeholder="Type English (or coded text) here..."></textarea>
 
-  <div class="row">
-    <button id="encode">Encode →</button>
-    <button id="decode">← Decode</button>
-    <button id="clear">Clear</button>
+    <div class="row">
+      <button id="encode">Encode →</button>
+      <button id="decode">← Decode</button>
+      <button id="clear">Clear</button>
 
-    <label>
-      Suffix mode:
-      <select id="suffixMode">
-        <option value="single" selected>Single</option>
-        <option value="aeo">AEO Rotate</option>
-      </select>
-    </label>
+      <label>
+        Suffix mode:
+        <select id="suffixMode">
+          <option value="single" selected>Single</option>
+          <option value="aeo">AEO Rotate</option>
+        </select>
+      </label>
 
-    <label>
-      Suffix:
-      <select id="suffix"></select>
-    </label>
+      <label>
+        Suffix:
+        <select id="suffix"></select>
+      </label>
 
-    <label>
-      Preserve capitalization:
-      <select id="caps">
-        <option value="yes">Yes</option>
-        <option value="no" selected>No</option>
-      </select>
-    </label>
-  </div>
+      <label>
+        Preserve capitalization:
+        <select id="caps">
+          <option value="yes">Yes</option>
+          <option value="no" selected>No</option>
+        </select>
+      </label>
+    </div>
 
-  <label for="output">Output</label>
-  <textarea id="output" readonly></textarea>
+    <label for="output">Output</label>
+    <textarea id="output" readonly></textarea>
 
-  <div class="hint">
-    Rule: move first letter to end + add suffix (encode). Remove suffix + move last letter to front (decode).
-    AEO Rotate counts only word tokens (punctuation doesn’t affect the cycle). Apostrophes inside words are preserved. 🙂
-  </div>
+    <div class="hint">
+      Rule: move first letter to end + add suffix (encode). Remove suffix + move last letter to front (decode).
+      AEO Rotate counts only word tokens (punctuation doesn’t affect the cycle). Apostrophes inside words are preserved. 🙂
+    </div>
 
-<script>
-  const inputEl = document.getElementById("input");
-  const outputEl = document.getElementById("output");
-  const suffixEl = document.getElementById("suffix");
-  const suffixModeEl = document.getElementById("suffixMode");
-  const capsEl = document.getElementById("caps");
-  const clearBtn = document.getElementById("clear");
+  <script>
+    const inputEl = document.getElementById("input");
+    const outputEl = document.getElementById("output");
+    const suffixEl = document.getElementById("suffix");
+    const suffixModeEl = document.getElementById("suffixMode");
+    const capsEl = document.getElementById("caps");
+    const clearBtn = document.getElementById("clear");
 
-  // Populate suffix dropdown with a–z (default = a)
-  (function initSuffixOptions() {
-    const letters = "abcdefghijklmnopqrstuvwxyz";
-    const defaultSuffix = "a";
-    suffixEl.innerHTML = "";
-    for (const ch of letters) {
-      const opt = document.createElement("option");
-      opt.value = ch;
-      opt.textContent = ch;
-      if (ch === defaultSuffix) opt.selected = true;
-      suffixEl.appendChild(opt);
+    // Populate suffix dropdown with a–z (default = a)
+    (function initSuffixOptions() {
+      const letters = "abcdefghijklmnopqrstuvwxyz";
+      const defaultSuffix = "a";
+      suffixEl.innerHTML = "";
+      for (const ch of letters) {
+        const opt = document.createElement("option");
+        opt.value = ch;
+        opt.textContent = ch;
+        if (ch === defaultSuffix) opt.selected = true;
+        suffixEl.appendChild(opt);
+      }
+    })();
+
+    // (Optional UX) Disable manual suffix picker when in AEO mode
+    function syncSuffixUI() {
+      const mode = suffixModeEl.value;
+      suffixEl.disabled = (mode === "aeo");
+      suffixEl.style.opacity = (mode === "aeo") ? "0.55" : "1";
     }
-  })();
+    suffixModeEl.addEventListener("change", syncSuffixUI);
+    syncSuffixUI();
 
-  // (Optional UX) Disable manual suffix picker when in AEO mode
-  function syncSuffixUI() {
-    const mode = suffixModeEl.value;
-    suffixEl.disabled = (mode === "aeo");
-    suffixEl.style.opacity = (mode === "aeo") ? "0.55" : "1";
-  }
-  suffixModeEl.addEventListener("change", syncSuffixUI);
-  syncSuffixUI();
+    // Tokenizer: keeps internal apostrophes together (supports ' and ’)
+    // Words = letters possibly containing internal apostrophes. Everything else preserved.
+    function tokenize(text) {
+      return text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*|[^A-Za-z]+/g) || [];
+    }
 
-  // Tokenizer: keeps internal apostrophes together (supports ' and ’)
-  // Words = letters possibly containing internal apostrophes. Everything else preserved.
-  function tokenize(text) {
-    return text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*|[^A-Za-z]+/g) || [];
-  }
+    function detectCapsStyle(word) {
+      if (word.toUpperCase() === word) return "upper";
+      if (word[0].toUpperCase() === word[0] &&
+          word.slice(1).toLowerCase() === word.slice(1)) return "title";
+      return "lower";
+    }
 
-  function detectCapsStyle(word) {
-    if (word.toUpperCase() === word) return "upper";
-    if (word[0].toUpperCase() === word[0] &&
-        word.slice(1).toLowerCase() === word.slice(1)) return "title";
-    return "lower";
-  }
+    function encodeWord(word, suffix, preserveCaps) {
+      const style = preserveCaps ? detectCapsStyle(word) : "lower";
+      const w = word.toLowerCase();
+      if (w.length < 1) return word;
 
-  function encodeWord(word, suffix, preserveCaps) {
-    const style = preserveCaps ? detectCapsStyle(word) : "lower";
-    const w = word.toLowerCase();
-    if (w.length < 1) return word;
+      let coded = w.slice(1) + w[0] + suffix;
 
-    let coded = w.slice(1) + w[0] + suffix;
+      if (!preserveCaps) return coded;
 
-    if (!preserveCaps) return coded;
+      // Preserve ALL-CAPS words (USA -> SAUz)
+      if (style === "upper") return coded.toUpperCase();
 
-    // Preserve ALL-CAPS words (USA -> SAUz)
-    if (style === "upper") return coded.toUpperCase();
+      // Preserve Title Case by keeping the ORIGINAL first letter capital,
+      // even though it moved to the end (before suffix).
+      if (style === "title") {
+        const movedLetterIndex = coded.length - 1 - suffix.length; // position of moved first letter
+        coded =
+          coded.slice(0, movedLetterIndex) +
+          coded[movedLetterIndex].toUpperCase() +
+          coded.slice(movedLetterIndex + 1);
+        return coded;
+      }
 
-    // Preserve Title Case by keeping the ORIGINAL first letter capital,
-    // even though it moved to the end (before suffix).
-    if (style === "title") {
-      const movedLetterIndex = coded.length - 1 - suffix.length; // position of moved first letter
-      coded =
-        coded.slice(0, movedLetterIndex) +
-        coded[movedLetterIndex].toUpperCase() +
-        coded.slice(movedLetterIndex + 1);
+      // lower
       return coded;
     }
 
-    // lower
-    return coded;
-  }
+    function decodeWord(word, suffix, preserveCaps) {
+      const style = preserveCaps ? detectCapsStyle(word) : "lower";
+      const w = word.toLowerCase();
+      if (!w.endsWith(suffix) || w.length < 2) return word;
 
-  function decodeWord(word, suffix, preserveCaps) {
-    const style = preserveCaps ? detectCapsStyle(word) : "lower";
-    const w = word.toLowerCase();
-    if (!w.endsWith(suffix) || w.length < 2) return word;
+      const core = w.slice(0, -1);
+      let plain = core.slice(-1) + core.slice(0, -1);
 
-    const core = w.slice(0, -1);
-    let plain = core.slice(-1) + core.slice(0, -1);
+      if (!preserveCaps) return plain;
 
-    if (!preserveCaps) return plain;
+      // Preserve ALL-CAPS words
+      if (style === "upper") return plain.toUpperCase();
 
-    // Preserve ALL-CAPS words
-    if (style === "upper") return plain.toUpperCase();
+      // Preserve Title Case by capitalizing the restored first letter
+      if (style === "title") {
+        plain = plain[0].toUpperCase() + plain.slice(1);
+        return plain;
+      }
 
-    // Preserve Title Case by capitalizing the restored first letter
-    if (style === "title") {
-      plain = plain[0].toUpperCase() + plain.slice(1);
       return plain;
     }
 
-    return plain;
-  }
-
-  // Picks suffix per word depending on mode.
-  // wordIndex counts ONLY actual word tokens (commas/spaces don’t increment it).
-  function getSuffixForWord(wordIndex) {
-    const mode = suffixModeEl.value;
-    if (mode === "aeo") {
-      const cycle = ["a", "e", "o"];
-      return cycle[wordIndex % cycle.length];
-    }
-    return suffixEl.value;
-  }
-
-  function transform(text, mode) {
-    const preserveCaps = capsEl.value === "yes";
-    const tokens = tokenize(text);
-
-    let wordIndex = 0; // counts only word tokens
-    const out = tokens.map(tok => {
-      if (/^[A-Za-z]/.test(tok)) {
-        const suffix = getSuffixForWord(wordIndex);
-        const result = (mode === "encode")
-          ? encodeWord(tok, suffix, preserveCaps)
-          : decodeWord(tok, suffix, preserveCaps);
-        wordIndex++;
-        return result;
+    // Picks suffix per word depending on mode.
+    // wordIndex counts ONLY actual word tokens (commas/spaces don’t increment it).
+    function getSuffixForWord(wordIndex) {
+      const mode = suffixModeEl.value;
+      if (mode === "aeo") {
+        const cycle = ["a", "e", "o"];
+        return cycle[wordIndex % cycle.length];
       }
-      return tok; // punctuation/space/etc.
-    });
+      return suffixEl.value;
+    }
 
-    return out.join("");
-  }
+    function transform(text, mode) {
+      const preserveCaps = capsEl.value === "yes";
+      const tokens = tokenize(text);
 
-  document.getElementById("encode").onclick = () =>
-    outputEl.value = transform(inputEl.value, "encode");
+      let wordIndex = 0; // counts only word tokens
+      const out = tokens.map(tok => {
+        if (/^[A-Za-z]/.test(tok)) {
+          const suffix = getSuffixForWord(wordIndex);
+          const result = (mode === "encode")
+            ? encodeWord(tok, suffix, preserveCaps)
+            : decodeWord(tok, suffix, preserveCaps);
+          wordIndex++;
+          return result;
+        }
+        return tok; // punctuation/space/etc.
+      });
 
-  document.getElementById("decode").onclick = () =>
-    outputEl.value = transform(inputEl.value, "decode");
+      return out.join("");
+    }
 
-  clearBtn.onclick = () => {
-    inputEl.value = "";
-    outputEl.value = "";
-    inputEl.focus();
-  };
-</script>
+    document.getElementById("encode").onclick = () =>
+      outputEl.value = transform(inputEl.value, "encode");
+
+    document.getElementById("decode").onclick = () =>
+      outputEl.value = transform(inputEl.value, "decode");
+
+    clearBtn.onclick = () => {
+      inputEl.value = "";
+      outputEl.value = "";
+      inputEl.focus();
+    };
+  </script>
+  </div>
 </body>
 </html>
