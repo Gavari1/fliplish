@@ -73,7 +73,11 @@
       user-select: none;
     }
 
-    .hint { opacity: 0.75; font-size: 13px; margin-top: 8px; }
+    .hint {
+      opacity: 0.75;
+      font-size: 13px;
+      margin-top: 8px;
+    }
   </style>
 </head>
 
@@ -94,7 +98,6 @@
         <option value="single" selected>Single</option>
         <option value="aeo">AEO Rotate</option>
         <option value="random">Random (A–Z)</option>
-        <option value="streetRandom">Random (CH/SH/TH/BZ)</option>
       </select>
     </label>
 
@@ -119,7 +122,7 @@
       </select>
     </label>
 
-    <label class="chk" title="Recommended: Decode auto-detects per word (works even if sender used different settings)">
+    <label class="chk" title="Decode auto-detects per word">
       <input id="smartDecode" type="checkbox" checked />
       Smart Decode
     </label>
@@ -128,19 +131,17 @@
   <textarea id="output" readonly></textarea>
 
   <div class="hint">
-    How Fliplish works: Each word is encoded by moving the first one or two letters to the end of the word and then adding a suffix.
-    To decode, the suffix is removed and those letters are moved back to the front, restoring the original word.
-    Punctuation, spacing, and contractions (like I’m or don’t) are preserved so the text stays readable.
+    How Fliplish works: Each word is encoded by moving the first one or two letters
+    to the end of the word and adding a suffix. Decode reverses the process while
+    preserving punctuation and spacing.
   </div>
 </div>
 
 <script>
-/** ====== Suffixes ====== **/
+/* ===== Suffixes ===== */
 const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
-const EXTRA_SUFFIXES = ["sh", "ch", "th", "bz"]; // ✅ added BZ
-const ALL_SUFFIXES = [...EXTRA_SUFFIXES, ...LETTERS];
 
-/** ====== Elements ====== **/
+/* ===== Elements ===== */
 const inputEl = document.getElementById("input");
 const outputEl = document.getElementById("output");
 const suffixEl = document.getElementById("suffix");
@@ -149,10 +150,10 @@ const moveNEl = document.getElementById("moveN");
 const capsEl = document.getElementById("caps");
 const smartDecodeEl = document.getElementById("smartDecode");
 
-/** ====== Init suffix dropdown (SH/CH/TH/BZ then A-Z) ====== **/
+/* ===== Init suffix dropdown ===== */
 (function initSuffix() {
   suffixEl.innerHTML = "";
-  for (const s of ALL_SUFFIXES) {
+  for (const s of LETTERS) {
     const o = document.createElement("option");
     o.value = s;
     o.textContent = s.toUpperCase();
@@ -161,60 +162,31 @@ const smartDecodeEl = document.getElementById("smartDecode");
   }
 })();
 
-/** Disable manual suffix picker in AEO/Random modes */
 function syncSuffixUI() {
-  const mode = suffixModeEl.value;
-  const disabled = (mode === "aeo" || mode === "random" || mode === "streetRandom"); // ✅ include streetRandom
+  const disabled = suffixModeEl.value !== "single";
   suffixEl.disabled = disabled;
   suffixEl.style.opacity = disabled ? "0.55" : "1";
 }
 suffixModeEl.addEventListener("change", syncSuffixUI);
 syncSuffixUI();
 
-/** ====== Tokenizer ======
-  Keeps words together and preserves punctuation.
-  Also keeps apostrophes inside words (I'm, don't) as part of the token.
-**/
+/* ===== Helpers ===== */
 function tokenize(text) {
   return text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*|[^A-Za-z]+/g) || [];
 }
 
 function detectCapsStyle(word) {
   if (word === word.toUpperCase()) return "upper";
-  if (word[0] === word[0].toUpperCase() && word.slice(1) === word.slice(1).toLowerCase()) return "title";
+  if (word[0] === word[0].toUpperCase()) return "title";
   return "lower";
 }
 
-/** ====== Apostrophe-safe helpers ====== **/
-function splitApostrophes(word) {
-  const letters = [];
-  const apos = [];
-  [...word].forEach((c, i) => {
-    if (c === "'" || c === "’") apos.push({ i, c });
-    else letters.push(c);
-  });
-  return { letters: letters.join(""), apos };
-}
-
-function restoreApostrophes(word, apos) {
-  const arr = [...word];
-  apos.forEach(({ i, c }) => {
-    const idx = Math.max(0, Math.min(i, arr.length));
-    arr.splice(idx, 0, c);
-  });
-  return arr.join("");
-}
-
-/** ====== Core encode/decode ====== **/
+/* ===== Encode / Decode ===== */
 function encodeWord(word, suffix, preserveCaps, moveN) {
   const style = preserveCaps ? detectCapsStyle(word) : "lower";
   const lower = word.toLowerCase();
-  const { letters, apos } = splitApostrophes(lower);
-  if (!letters) return word;
-
-  const n = Math.min(moveN, letters.length);
-  let codedLetters = letters.slice(n) + letters.slice(0, n) + suffix;
-  let coded = restoreApostrophes(codedLetters, apos);
+  const n = Math.min(moveN, lower.length);
+  let coded = lower.slice(n) + lower.slice(0, n) + suffix;
 
   if (!preserveCaps) return coded;
   if (style === "upper") return coded.toUpperCase();
@@ -228,12 +200,8 @@ function decodeWord(word, suffix, preserveCaps, moveN) {
   if (!lower.endsWith(suffix)) return word;
 
   const core = lower.slice(0, -suffix.length);
-  const { letters, apos } = splitApostrophes(core);
-  if (!letters) return word;
-
-  const n = Math.min(moveN, letters.length);
-  let plainLetters = letters.slice(-n) + letters.slice(0, -n);
-  let plain = restoreApostrophes(plainLetters, apos);
+  const n = Math.min(moveN, core.length);
+  let plain = core.slice(-n) + core.slice(0, -n);
 
   if (!preserveCaps) return plain;
   if (style === "upper") return plain.toUpperCase();
@@ -241,143 +209,31 @@ function decodeWord(word, suffix, preserveCaps, moveN) {
   return plain;
 }
 
-/** ====== Suffix selection ====== **/
-function randomSuffix() {
-  const mode = suffixModeEl.value;
-
-  // ✅ Random (A–Z) ONLY
-  if (mode === "random") {
-    return LETTERS[Math.floor(Math.random() * LETTERS.length)];
-  }
-
-  // ✅ Random (Street) ONLY: CH/SH/TH/BZ
-  if (mode === "streetRandom") {
-    return EXTRA_SUFFIXES[Math.floor(Math.random() * EXTRA_SUFFIXES.length)];
-  }
-
-  // fallback (shouldn't hit)
-  return LETTERS[Math.floor(Math.random() * LETTERS.length)];
-}
-
 function getSuffixForWord(i) {
   const mode = suffixModeEl.value;
   if (mode === "aeo") return ["a","e","o"][i % 3];
-  if (mode === "random" || mode === "streetRandom") return randomSuffix(); // ✅ both random modes
-  return suffixEl.value; // single
+  if (mode === "random") return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  return suffixEl.value;
 }
 
-/** Pull suffix from a token (supports 2-letter suffixes SH/CH/TH/BZ) */
-function suffixFromToken(tok) {
-  const low = tok.toLowerCase();
-  // prefer longest match first (2-letter suffixes)
-  for (const s of EXTRA_SUFFIXES) {
-    if (low.endsWith(s)) return s;
-  }
-  // fallback 1-letter
-  const last = low[low.length - 1] || "";
-  return /[a-z]/.test(last) ? last : null;
-}
-
-/** ====== Smart Decode ====== **/
-const COMMON = new Set([
-  "the","a","an","and","or","but","is","are","was","were","be","been","being",
-  "i","you","he","she","it","we","they","me","him","her","us","them",
-  "my","your","his","hers","our","their",
-  "to","of","in","on","at","for","from","with","as","by",
-  "this","that","these","those","not","no","yes",
-  "table","carpet","front","house","road","store","tomorrow","today","now","then",
-  "test","program"
-]);
-
-const COMMON_TRI = ["the","and","pro","con","int","for","tha","thi","wit","you","not","are","was"];
-
-function scorePlainWord(w) {
-  const low = w.toLowerCase();
-  const lettersOnly = low.replace(/[^a-z]/g, "");
-  if (lettersOnly.length === 0) return -999;
-
-  let score = 0;
-
-  if (COMMON.has(lettersOnly)) score += 8;
-
-  const vowels = (lettersOnly.match(/[aeiouy]/g) || []).length;
-  score += vowels * 2;
-
-  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 7;
-  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;
-  if (/(.)\1\1/.test(lettersOnly)) score -= 3;
-
-  if (/(ing|ed|ly|tion|s)$/.test(lettersOnly)) score += 2;
-
-  if (low.includes("'") || low.includes("’")) {
-    if (/^['’]/.test(low)) score -= 10;
-    if (/[a-z]['’][a-z]/.test(low)) score += 2;
-  }
-
-  return score;
-}
-
-function smartDecodeToken(tok, preserveCaps) {
-  const sfx = suffixFromToken(tok);
-  if (!sfx) return tok;
-
-  const cand1 = decodeWord(tok, sfx, preserveCaps, 1);
-  const cand2 = decodeWord(tok, sfx, preserveCaps, 2);
-
-  const sc1 = scorePlainWord(cand1);
-  const sc2 = scorePlainWord(cand2);
-
-  if (sc2 > sc1 + 1) return cand2;
-  if (sc1 > sc2 + 1) return cand1;
-
-  const a = cand1.toLowerCase().replace(/[^a-z'’]/g, "");
-  const b = cand2.toLowerCase().replace(/[^a-z'’]/g, "");
-
-  const aClean = a.replace(/['’]/g, "");
-  const bClean = b.replace(/['’]/g, "");
-
-  if (COMMON.has(bClean) && !COMMON.has(aClean)) return cand2;
-  if (COMMON.has(aClean) && !COMMON.has(bClean)) return cand1;
-
-  const a3 = aClean.slice(0,3);
-  const b3 = bClean.slice(0,3);
-  if (COMMON_TRI.includes(b3) && !COMMON_TRI.includes(a3)) return cand2;
-  if (COMMON_TRI.includes(a3) && !COMMON_TRI.includes(b3)) return cand1;
-
-  return cand2;
-}
-
-/** ====== Transform ====== **/
+/* ===== Transform ===== */
 function transform(text, mode) {
   const preserveCaps = capsEl.value === "yes";
   let wordIndex = 0;
 
   return tokenize(text).map(tok => {
     if (/^[A-Za-z]/.test(tok)) {
-      if (mode === "encode") {
-        const moveN = +moveNEl.value;
-        const suffix = getSuffixForWord(wordIndex);
-        wordIndex++;
-        return encodeWord(tok, suffix, preserveCaps, moveN);
-      } else {
-        const useSmart = !!smartDecodeEl?.checked;
-
-        if (useSmart) {
-          wordIndex++;
-          return smartDecodeToken(tok, preserveCaps);
-        }
-
-        const moveN = +moveNEl.value;
-        const suffix = suffixFromToken(tok) || getSuffixForWord(wordIndex);
-        wordIndex++;
-        return decodeWord(tok, suffix, preserveCaps, moveN);
-      }
+      const moveN = +moveNEl.value;
+      const suffix = getSuffixForWord(wordIndex++);
+      return mode === "encode"
+        ? encodeWord(tok, suffix, preserveCaps, moveN)
+        : decodeWord(tok, suffix, preserveCaps, moveN);
     }
     return tok;
   }).join("");
 }
 
-/** ====== Buttons ====== **/
+/* ===== Buttons ===== */
 document.getElementById("encode").onclick = () =>
   outputEl.value = transform(inputEl.value, "encode");
 
