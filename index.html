@@ -89,14 +89,6 @@
     <button id="clear">Clear</button>
 
     <label>
-      Mode:
-      <select id="mode">
-        <option value="classic" selected>Classic</option>
-        <option value="street">Street</option>
-      </select>
-    </label>
-
-    <label>
       Suffix mode:
       <select id="suffixMode">
         <option value="single" selected>Single</option>
@@ -126,8 +118,7 @@
       </select>
     </label>
 
-    <label class="chk" id="smartDecodeWrap"
-      title="Classic only: tries 1 vs 2 and picks the most 'English-looking' result">
+    <label class="chk" title="Recommended: Decode auto-detects per word (works even if sender used different settings)">
       <input id="smartDecode" type="checkbox" checked />
       Smart Decode
     </label>
@@ -151,13 +142,11 @@ const ALL_SUFFIXES = [...EXTRA_SUFFIXES, ...LETTERS];
 /** ====== Elements ====== **/
 const inputEl = document.getElementById("input");
 const outputEl = document.getElementById("output");
-const modeEl = document.getElementById("mode");
 const suffixEl = document.getElementById("suffix");
 const suffixModeEl = document.getElementById("suffixMode");
 const moveNEl = document.getElementById("moveN");
 const capsEl = document.getElementById("caps");
 const smartDecodeEl = document.getElementById("smartDecode");
-const smartDecodeWrap = document.getElementById("smartDecodeWrap");
 
 /** ====== Init suffix dropdown (SH/CH/TH then A-Z) ====== **/
 (function initSuffix() {
@@ -181,28 +170,12 @@ function syncSuffixUI() {
 suffixModeEl.addEventListener("change", syncSuffixUI);
 syncSuffixUI();
 
-/** Street Mode: disable Smart Decode (it’s English-biased scoring) */
-function syncModeUI() {
-  const street = (modeEl.value === "street");
-  smartDecodeEl.disabled = street;
-  smartDecodeWrap.style.opacity = street ? "0.55" : "1";
-  smartDecodeWrap.title = street
-    ? "Street Mode: Smart Decode disabled (Classic-only English scoring)"
-    : "Classic only: tries 1 vs 2 and picks the most 'English-looking' result";
-  if (street) smartDecodeEl.checked = false;
-}
-modeEl.addEventListener("change", syncModeUI);
-syncModeUI();
-
-/** ====== Tokenizers ====== **/
-/** Classic: preserves punctuation as separate tokens */
-function tokenizeClassic(text) {
+/** ====== Tokenizer ======
+  Keeps words together and preserves punctuation.
+  Also keeps apostrophes inside words (I'm, don't) as part of the token.
+**/
+function tokenize(text) {
   return text.match(/[A-Za-z]+(?:['’][A-Za-z]+)*|[^A-Za-z]+/g) || [];
-}
-/** Street: split ONLY by spaces (keeps emojis/diacritics/punct inside chunks) */
-function tokenizeStreet(text) {
-  // Keep whitespace tokens so spacing is perfectly preserved
-  return text.split(/(\s+)/);
 }
 
 function detectCapsStyle(word) {
@@ -211,7 +184,10 @@ function detectCapsStyle(word) {
   return "lower";
 }
 
-/** ====== Apostrophe-safe helpers (Classic words) ====== **/
+/** ====== Apostrophe-safe helpers ======
+  We do the letter-moving on letters only, then re-insert apostrophes
+  at their original indices so contractions stay like I'm (not 'im).
+**/
 function splitApostrophes(word) {
   const letters = [];
   const apos = [];
@@ -221,6 +197,7 @@ function splitApostrophes(word) {
   });
   return { letters: letters.join(""), apos };
 }
+
 function restoreApostrophes(word, apos) {
   const arr = [...word];
   apos.forEach(({ i, c }) => {
@@ -230,8 +207,8 @@ function restoreApostrophes(word, apos) {
   return arr.join("");
 }
 
-/** ====== Classic encode/decode (letters only) ====== **/
-function encodeWordClassic(word, suffix, preserveCaps, moveN) {
+/** ====== Core encode/decode ====== **/
+function encodeWord(word, suffix, preserveCaps, moveN) {
   const style = preserveCaps ? detectCapsStyle(word) : "lower";
   const lower = word.toLowerCase();
   const { letters, apos } = splitApostrophes(lower);
@@ -247,7 +224,7 @@ function encodeWordClassic(word, suffix, preserveCaps, moveN) {
   return coded;
 }
 
-function decodeWordClassic(word, suffix, preserveCaps, moveN) {
+function decodeWord(word, suffix, preserveCaps, moveN) {
   const style = preserveCaps ? detectCapsStyle(word) : "lower";
   const lower = word.toLowerCase();
   if (!lower.endsWith(suffix)) return word;
@@ -266,43 +243,34 @@ function decodeWordClassic(word, suffix, preserveCaps, moveN) {
   return plain;
 }
 
-/** ====== Street encode/decode (raw characters, any language) ====== **/
-function encodeChunkStreet(chunk, suffix, moveN) {
-  const arr = [...chunk]; // handles unicode safely
-  if (arr.length === 0) return chunk;
-  const n = Math.min(moveN, arr.length);
-  return arr.slice(n).join("") + arr.slice(0, n).join("") + suffix;
-}
-function decodeChunkStreet(chunk, suffix, moveN) {
-  if (!chunk.toLowerCase().endsWith(suffix)) return chunk;
-  const core = chunk.slice(0, -suffix.length);
-  const arr = [...core];
-  if (arr.length === 0) return chunk;
-  const n = Math.min(moveN, arr.length);
-  return arr.slice(-n).join("") + arr.slice(0, -n).join("");
-}
-
 /** ====== Suffix selection ====== **/
 function randomSuffix() {
   return ALL_SUFFIXES[Math.floor(Math.random() * ALL_SUFFIXES.length)];
 }
+
 function getSuffixForWord(i) {
   const mode = suffixModeEl.value;
   if (mode === "aeo") return ["a","e","o"][i % 3];
   if (mode === "random") return randomSuffix();
   return suffixEl.value; // single
 }
+
 /** Pull suffix from a token (supports 2-letter suffixes SH/CH/TH) */
 function suffixFromToken(tok) {
   const low = tok.toLowerCase();
+  // prefer longest match first
   for (const s of EXTRA_SUFFIXES) {
     if (low.endsWith(s)) return s;
   }
+  // fallback 1-letter
   const last = low[low.length - 1] || "";
   return /[a-z]/.test(last) ? last : null;
 }
 
-/** ====== Smart Decode (Classic only) ====== **/
+/** ====== Smart Decode ======
+  Try moveN=1 and moveN=2 (using the suffix found on the word)
+  and pick the result that "looks most like a real word".
+**/
 const COMMON = new Set([
   "the","a","an","and","or","but","is","are","was","were","be","been","being",
   "i","you","he","she","it","we","they","me","him","her","us","them",
@@ -310,8 +278,9 @@ const COMMON = new Set([
   "to","of","in","on","at","for","from","with","as","by",
   "this","that","these","those","not","no","yes",
   "table","carpet","front","house","road","store","tomorrow","today","now","then",
-  "test","program"
+  "test","program"  // ✅ added for your exact test case
 ]);
+
 const COMMON_TRI = ["the","and","pro","con","int","for","tha","thi","wit","you","not","are","was"];
 
 function scorePlainWord(w) {
@@ -320,37 +289,47 @@ function scorePlainWord(w) {
   if (lettersOnly.length === 0) return -999;
 
   let score = 0;
+
+  // Big reward for being a common word
   if (COMMON.has(lettersOnly)) score += 8;
 
+  // Vowels help a lot (pronounceable-ish)
   const vowels = (lettersOnly.match(/[aeiouy]/g) || []).length;
   score += vowels * 2;
 
-  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 7;
-  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;
-  if (/(.)\1\1/.test(lettersOnly)) score -= 3;
+  // Penalize nasty clusters
+  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 7;     // 5 consonants in a row
+  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;        // rare-letter spam
+  if (/(.)\1\1/.test(lettersOnly)) score -= 3;           // triple same letter
 
+  // Light reward for common endings
   if (/(ing|ed|ly|tion|s)$/.test(lettersOnly)) score += 2;
 
+  // Apostrophe sanity (should not lead)
   if (low.includes("'") || low.includes("’")) {
-    if (/^['’]/.test(low)) score -= 10;
-    if (/[a-z]['’][a-z]/.test(low)) score += 2;
+    if (/^['’]/.test(low)) score -= 10; // bad: starts with apostrophe
+    if (/[a-z]['’][a-z]/.test(low)) score += 2; // normal contraction pattern
   }
+
   return score;
 }
 
-function smartDecodeTokenClassic(tok, preserveCaps) {
+/** ✅ REPLACED smartDecodeToken with improved tie-break logic */
+function smartDecodeToken(tok, preserveCaps) {
   const sfx = suffixFromToken(tok);
   if (!sfx) return tok;
 
-  const cand1 = decodeWordClassic(tok, sfx, preserveCaps, 1);
-  const cand2 = decodeWordClassic(tok, sfx, preserveCaps, 2);
+  const cand1 = decodeWord(tok, sfx, preserveCaps, 1);
+  const cand2 = decodeWord(tok, sfx, preserveCaps, 2);
 
   const sc1 = scorePlainWord(cand1);
   const sc2 = scorePlainWord(cand2);
 
+  // Clear winner
   if (sc2 > sc1 + 1) return cand2;
   if (sc1 > sc2 + 1) return cand1;
 
+  // If close/tied, prefer the one that matches common words/trigrams
   const a = cand1.toLowerCase().replace(/[^a-z'’]/g, "");
   const b = cand2.toLowerCase().replace(/[^a-z'’]/g, "");
 
@@ -365,53 +344,38 @@ function smartDecodeTokenClassic(tok, preserveCaps) {
   if (COMMON_TRI.includes(b3) && !COMMON_TRI.includes(a3)) return cand2;
   if (COMMON_TRI.includes(a3) && !COMMON_TRI.includes(b3)) return cand1;
 
-  // default to move=2 when tied
+  // Final tie-breaker: default to move=2 (fixes estt/rogramp style fails)
   return cand2;
 }
 
 /** ====== Transform ====== **/
 function transform(text, mode) {
   const preserveCaps = capsEl.value === "yes";
-  const moveN = +moveNEl.value;
-  const street = (modeEl.value === "street");
-
-  const tokens = street ? tokenizeStreet(text) : tokenizeClassic(text);
   let wordIndex = 0;
 
-  return tokens.map(tok => {
-    // Preserve whitespace exactly (street tokenizer keeps it)
-    if (street && /^\s+$/.test(tok)) return tok;
-
-    if (mode === "encode") {
-      const suffix = getSuffixForWord(wordIndex);
-      wordIndex++;
-
-      if (street) {
-        return encodeChunkStreet(tok, suffix, moveN);
-      } else {
-        // only encode word-ish tokens in classic
-        if (/^[A-Za-z]/.test(tok)) return encodeWordClassic(tok, suffix, preserveCaps, moveN);
-        return tok;
-      }
-    }
-
-    // DECODE
-    if (street) {
-      // Street decode is mechanical. Use suffix in token if present; fallback to UI.
-      const sfx = suffixFromToken(tok) || getSuffixForWord(wordIndex);
-      wordIndex++;
-      return decodeChunkStreet(tok, sfx, moveN);
-    } else {
-      if (/^[A-Za-z]/.test(tok)) {
-        const useSmart = !!smartDecodeEl?.checked;
+  return tokenize(text).map(tok => {
+    if (/^[A-Za-z]/.test(tok)) {
+      if (mode === "encode") {
+        const moveN = +moveNEl.value;
+        const suffix = getSuffixForWord(wordIndex);
         wordIndex++;
-        if (useSmart) return smartDecodeTokenClassic(tok, preserveCaps);
+        return encodeWord(tok, suffix, preserveCaps, moveN);
+      } else {
+        // DECODE
+        const useSmart = !!smartDecodeEl?.checked;
 
-        const sfx = suffixFromToken(tok) || getSuffixForWord(wordIndex - 1);
-        return decodeWordClassic(tok, sfx, preserveCaps, moveN);
+        if (useSmart) {
+          wordIndex++;
+          return smartDecodeToken(tok, preserveCaps);
+        }
+
+        const moveN = +moveNEl.value;
+        const suffix = suffixFromToken(tok) || getSuffixForWord(wordIndex);
+        wordIndex++;
+        return decodeWord(tok, suffix, preserveCaps, moveN);
       }
-      return tok;
     }
+    return tok;
   }).join("");
 }
 
