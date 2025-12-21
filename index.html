@@ -93,7 +93,8 @@
       <select id="suffixMode">
         <option value="single" selected>Single</option>
         <option value="aeo">AEO Rotate</option>
-        <option value="random">Random</option>
+        <option value="random">Random (A–Z)</option>
+        <option value="streetRandom">Random (CH/SH/TH/BZ)</option>
       </select>
     </label>
 
@@ -136,7 +137,7 @@
 <script>
 /** ====== Suffixes ====== **/
 const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
-const EXTRA_SUFFIXES = ["sh", "ch", "th"]; // shown first
+const EXTRA_SUFFIXES = ["sh", "ch", "th", "bz"]; // ✅ added BZ
 const ALL_SUFFIXES = [...EXTRA_SUFFIXES, ...LETTERS];
 
 /** ====== Elements ====== **/
@@ -148,7 +149,7 @@ const moveNEl = document.getElementById("moveN");
 const capsEl = document.getElementById("caps");
 const smartDecodeEl = document.getElementById("smartDecode");
 
-/** ====== Init suffix dropdown (SH/CH/TH then A-Z) ====== **/
+/** ====== Init suffix dropdown (SH/CH/TH/BZ then A-Z) ====== **/
 (function initSuffix() {
   suffixEl.innerHTML = "";
   for (const s of ALL_SUFFIXES) {
@@ -160,10 +161,10 @@ const smartDecodeEl = document.getElementById("smartDecode");
   }
 })();
 
-/** Disable manual suffix picker in AEO/Random mode */
+/** Disable manual suffix picker in AEO/Random modes */
 function syncSuffixUI() {
   const mode = suffixModeEl.value;
-  const disabled = (mode === "aeo" || mode === "random");
+  const disabled = (mode === "aeo" || mode === "random" || mode === "streetRandom"); // ✅ include streetRandom
   suffixEl.disabled = disabled;
   suffixEl.style.opacity = disabled ? "0.55" : "1";
 }
@@ -184,10 +185,7 @@ function detectCapsStyle(word) {
   return "lower";
 }
 
-/** ====== Apostrophe-safe helpers ======
-  We do the letter-moving on letters only, then re-insert apostrophes
-  at their original indices so contractions stay like I'm (not 'im).
-**/
+/** ====== Apostrophe-safe helpers ====== **/
 function splitApostrophes(word) {
   const letters = [];
   const apos = [];
@@ -245,20 +243,33 @@ function decodeWord(word, suffix, preserveCaps, moveN) {
 
 /** ====== Suffix selection ====== **/
 function randomSuffix() {
-  return ALL_SUFFIXES[Math.floor(Math.random() * ALL_SUFFIXES.length)];
+  const mode = suffixModeEl.value;
+
+  // ✅ Random (A–Z) ONLY
+  if (mode === "random") {
+    return LETTERS[Math.floor(Math.random() * LETTERS.length)];
+  }
+
+  // ✅ Random (Street) ONLY: CH/SH/TH/BZ
+  if (mode === "streetRandom") {
+    return EXTRA_SUFFIXES[Math.floor(Math.random() * EXTRA_SUFFIXES.length)];
+  }
+
+  // fallback (shouldn't hit)
+  return LETTERS[Math.floor(Math.random() * LETTERS.length)];
 }
 
 function getSuffixForWord(i) {
   const mode = suffixModeEl.value;
   if (mode === "aeo") return ["a","e","o"][i % 3];
-  if (mode === "random") return randomSuffix();
+  if (mode === "random" || mode === "streetRandom") return randomSuffix(); // ✅ both random modes
   return suffixEl.value; // single
 }
 
-/** Pull suffix from a token (supports 2-letter suffixes SH/CH/TH) */
+/** Pull suffix from a token (supports 2-letter suffixes SH/CH/TH/BZ) */
 function suffixFromToken(tok) {
   const low = tok.toLowerCase();
-  // prefer longest match first
+  // prefer longest match first (2-letter suffixes)
   for (const s of EXTRA_SUFFIXES) {
     if (low.endsWith(s)) return s;
   }
@@ -267,10 +278,7 @@ function suffixFromToken(tok) {
   return /[a-z]/.test(last) ? last : null;
 }
 
-/** ====== Smart Decode ======
-  Try moveN=1 and moveN=2 (using the suffix found on the word)
-  and pick the result that "looks most like a real word".
-**/
+/** ====== Smart Decode ====== **/
 const COMMON = new Set([
   "the","a","an","and","or","but","is","are","was","were","be","been","being",
   "i","you","he","she","it","we","they","me","him","her","us","them",
@@ -278,7 +286,7 @@ const COMMON = new Set([
   "to","of","in","on","at","for","from","with","as","by",
   "this","that","these","those","not","no","yes",
   "table","carpet","front","house","road","store","tomorrow","today","now","then",
-  "test","program"  // ✅ added for your exact test case
+  "test","program"
 ]);
 
 const COMMON_TRI = ["the","and","pro","con","int","for","tha","thi","wit","you","not","are","was"];
@@ -290,31 +298,25 @@ function scorePlainWord(w) {
 
   let score = 0;
 
-  // Big reward for being a common word
   if (COMMON.has(lettersOnly)) score += 8;
 
-  // Vowels help a lot (pronounceable-ish)
   const vowels = (lettersOnly.match(/[aeiouy]/g) || []).length;
   score += vowels * 2;
 
-  // Penalize nasty clusters
-  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 7;     // 5 consonants in a row
-  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;        // rare-letter spam
-  if (/(.)\1\1/.test(lettersOnly)) score -= 3;           // triple same letter
+  if (/[^aeiouy]{5,}/.test(lettersOnly)) score -= 7;
+  if (/[jqxz]{2,}/.test(lettersOnly)) score -= 6;
+  if (/(.)\1\1/.test(lettersOnly)) score -= 3;
 
-  // Light reward for common endings
   if (/(ing|ed|ly|tion|s)$/.test(lettersOnly)) score += 2;
 
-  // Apostrophe sanity (should not lead)
   if (low.includes("'") || low.includes("’")) {
-    if (/^['’]/.test(low)) score -= 10; // bad: starts with apostrophe
-    if (/[a-z]['’][a-z]/.test(low)) score += 2; // normal contraction pattern
+    if (/^['’]/.test(low)) score -= 10;
+    if (/[a-z]['’][a-z]/.test(low)) score += 2;
   }
 
   return score;
 }
 
-/** ✅ REPLACED smartDecodeToken with improved tie-break logic */
 function smartDecodeToken(tok, preserveCaps) {
   const sfx = suffixFromToken(tok);
   if (!sfx) return tok;
@@ -325,11 +327,9 @@ function smartDecodeToken(tok, preserveCaps) {
   const sc1 = scorePlainWord(cand1);
   const sc2 = scorePlainWord(cand2);
 
-  // Clear winner
   if (sc2 > sc1 + 1) return cand2;
   if (sc1 > sc2 + 1) return cand1;
 
-  // If close/tied, prefer the one that matches common words/trigrams
   const a = cand1.toLowerCase().replace(/[^a-z'’]/g, "");
   const b = cand2.toLowerCase().replace(/[^a-z'’]/g, "");
 
@@ -344,7 +344,6 @@ function smartDecodeToken(tok, preserveCaps) {
   if (COMMON_TRI.includes(b3) && !COMMON_TRI.includes(a3)) return cand2;
   if (COMMON_TRI.includes(a3) && !COMMON_TRI.includes(b3)) return cand1;
 
-  // Final tie-breaker: default to move=2 (fixes estt/rogramp style fails)
   return cand2;
 }
 
@@ -361,7 +360,6 @@ function transform(text, mode) {
         wordIndex++;
         return encodeWord(tok, suffix, preserveCaps, moveN);
       } else {
-        // DECODE
         const useSmart = !!smartDecodeEl?.checked;
 
         if (useSmart) {
