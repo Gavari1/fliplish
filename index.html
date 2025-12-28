@@ -119,7 +119,7 @@
     // Apply multi-character sound changes FIRST (so "th" and "ng" can actually trigger)
     function preprocess(text){
       return text
-        .replace(/th/gi, "d")
+        .replace(/th/gi, "þ")
         .replace(/ng/gi, "n");
     }
 
