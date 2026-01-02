@@ -83,9 +83,9 @@
 <body>
   <div class="wrap">
     <div>
-      <h1>Nordic Micro Translator (100-word core + custom phrases)</h1>
+      <h1>Nordic Micro Translator (English → micro)</h1>
       <p>
-        Translates <span class="mono">micro → English</span>.
+        Translates <span class="mono">English → micro</span>.
         It checks phrase clusters in this order: <strong>5 words → 4 → 3 → 2 → 1</strong>.
         You can add/extend meanings by adding new lines in the dictionaries.
       </p>
@@ -93,8 +93,8 @@
 
     <div class="grid">
       <div class="card">
-        <div class="label">Input (micro language)</div>
-        <textarea id="input" class="mono" placeholder="Example: mi må mat nu, mi trø vel arb"></textarea>
+        <div class="label">Input (English)</div>
+        <textarea id="input" class="mono" placeholder="Example: I need food now, I am very bored at work"></textarea>
 
         <div class="row" style="margin-top:10px">
           <button id="translateBtn">Translate</button>
@@ -107,10 +107,10 @@
       </div>
 
       <div class="card">
-        <div class="label">Output (English)</div>
+        <div class="label">Output (micro language)</div>
         <textarea id="output" class="mono" readonly placeholder="Translation appears here..."></textarea>
         <div id="status" class="status" style="margin-top:10px">
-          <strong>Matches:</strong> 0 phrase(s), 0 word(s).
+          <strong>Matches:</strong> 0 phrase(s), 0 chunk(s).
         </div>
       </div>
     </div>
@@ -121,31 +121,34 @@
         <div class="split">
           <textarea id="customPhrases" class="mono small" spellcheck="false"></textarea>
           <div class="hint">
-            Format: <span class="mono">source phrase = english phrase</span><br/>
-            One per line. Use 2–5+ words. The translator will always prefer the longest match (5→1).<br/>
-            Example: <span class="mono">mi trø vel arb = I am so bored at work</span>
+            Format: <span class="mono">english phrase = micro phrase</span><br/>
+            One per line. Use 2–5+ words. Longest match wins (5→1).<br/>
+            Example: <span class="mono">i am so bored at work = mi trø vel arb</span>
           </div>
         </div>
       </div>
 
       <div class="card">
-        <div class="label">Custom single-word additions (optional)</div>
+        <div class="label">Custom micro word meanings (optional)</div>
         <div class="split">
           <textarea id="customWords" class="mono small" spellcheck="false"></textarea>
           <div class="hint">
-            Format: <span class="mono">word = meaning</span><br/>
-            Example: <span class="mono">dra = take away / pull / remove</span><br/>
-            If you add a word here, it overrides the built-in one.
+            Format: <span class="mono">micro = english meaning(s)</span><br/>
+            Add extra English synonyms by adding a new line for the same micro word.<br/>
+            Example:<br/>
+            <span class="mono">dra = take away / pull</span><br/>
+            <span class="mono">dra = take away / pull / remove</span><br/>
+            (Last line wins for that micro word’s meaning string, but we harvest all synonyms from all lines.)
           </div>
         </div>
       </div>
     </div>
 
     <div class="card">
-      <div class="label">Built-in 100-word core (micro → English)</div>
+      <div class="label">Built-in 100-word core (micro → English gloss)</div>
       <div class="hint">
-        Note: I fixed one collision from our earlier draft by using <span class="mono">hond</span> for “hand”
-        so <span class="mono">han</span> can stay “he”.
+        This is the base lexicon. The translator automatically inverts it to go English → micro.
+        (Also: <span class="mono">hond</span> = “hand” so <span class="mono">han</span> can stay “he”.)
       </div>
       <pre class="mono" style="white-space:pre-wrap;margin:10px 0 0 0; color:#0f172a; background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:12px" id="corePreview"></pre>
     </div>
@@ -153,83 +156,80 @@
 
   <script>
     /******************************************************************
-     * 1) BUILT-IN CORE (100 words)
-     *    - You can edit these lists too, but recommended: use Custom boxes.
-     *    - Words are lowercase keys.
+     * 1) BUILT-IN CORE (100 words) : micro -> English gloss
      ******************************************************************/
 
     // PRONOUNS (8)
     const CORE_PRONOUNS = [
       ["mi",  "I / me / my"],
-      ["tu",  "you"],
-      ["han", "he"],
-      ["sa",  "she"],
-      ["et",  "it"],
-      ["vi",  "we"],
-      ["de",  "they"],
+      ["tu",  "you / your / yours"],
+      ["han", "he / him / his"],
+      ["sa",  "she / her / hers"],
+      ["et",  "it / its"],
+      ["vi",  "we / us / our / ours"],
+      ["de",  "they / them / their / theirs"],
       ["alt", "all / everyone / everything"],
     ];
 
     // VERBS (18)
     const CORE_VERBS = [
-      ["es",   "be / exist"],
-      ["har",  "have"],
-      ["gor",  "do"],
-      ["far",  "go"],
-      ["kom",  "come"],
-      ["lag",  "make"],
-      ["tak",  "get / take / buy"],
-      ["giv",  "give"],
+      ["es",   "be / am / are / is / exist"],
+      ["har",  "have / has"],
+      ["gor",  "do / does"],
+      ["far",  "go / goes"],
+      ["kom",  "come / comes"],
+      ["lag",  "make / made / create"],
+      ["tak",  "get / got / take / took / buy / bought"],
+      ["giv",  "give / gave"],
       ["dra",  "take away / pull"],
-      ["dra", "remove"],
-      ["sen",  "see"],
-      ["tal",  "say / speak"],
-      ["vit",  "know"],
-      ["ten",  "think"],
-      ["vil",  "want"],
-      ["må",   "need / must"],
-      ["lik",  "like"],
-      ["arb",  "work (verb)"],
-      ["hjel", "help"],
+      ["sen",  "see / saw"],
+      ["tal",  "say / said / speak"],
+      ["vit",  "know / knew"],
+      ["ten",  "think / thought"],
+      ["vil",  "want / wants"],
+      ["må",   "need / needs / must"],
+      ["lik",  "like / likes"],
+      ["arb",  "work / works (verb)"],
+      ["hjel", "help / helps"],
     ];
 
     // NOUNS (22)
     const CORE_NOUNS = [
-      ["man",  "person"],
-      ["kar",  "man (male)"],
-      ["vin",  "woman"],
-      ["ung",  "child"],
-      ["sak",  "thing"],
-      ["stad", "place"],
-      ["hem",  "home"],
-      ["arb",  "work (noun)"],
+      ["man",  "person / people"],
+      ["kar",  "man / male"],
+      ["vin",  "woman / female"],
+      ["ung",  "child / kid / daughter / son"],
+      ["sak",  "thing / stuff"],
+      ["stad", "place / location"],
+      ["hem",  "home / house"],
+      ["arb",  "work / job (noun)"],
       ["tid",  "time"],
       ["dag",  "day"],
       ["nat",  "night"],
-      ["mat",  "food"],
+      ["mat",  "food / breakfast / lunch / dinner"],
       ["vat",  "water"],
-      ["pen",  "money"],
+      ["pen",  "money / cash"],
       ["bil",  "car"],
-      ["veg",  "road"],
+      ["veg",  "road / street"],
       ["kro",  "body"],
       ["hond", "hand"],
       ["hov",  "head"],
-      ["fel",  "problem"],
+      ["fel",  "problem / issue"],
       ["vei",  "way / path"],
       ["liv",  "life"],
     ];
 
     // DESCRIPTORS (16)
     const CORE_ADJ = [
-      ["bra",  "good"],
+      ["bra",  "good / great / ok"],
       ["ill",  "bad"],
-      ["stor", "big"],
-      ["lil",  "small"],
+      ["stor", "big / large"],
+      ["lil",  "small / little"],
       ["ny",   "new"],
       ["gam",  "old"],
-      ["het",  "hot"],
+      ["het",  "hot / warm"],
       ["kal",  "cold"],
-      ["snar", "fast"],
+      ["snar", "fast / quick"],
       ["seg",  "slow"],
       ["let",  "easy"],
       ["tung", "hard / heavy"],
@@ -251,44 +251,31 @@
       ["med", "with"],
       ["for", "for"],
       ["fra", "from"],
-      ["ne",  "no / not"],
+      ["ne",  "no / not / don't / doesnt / do not"],
       ["og",  "and"],
     ];
 
     // PARTICLES (4)
     const CORE_PART = [
-      ["ka",  "question marker"],
-      ["vel", "very"],
+      ["ka",  "question / ?"],
+      ["vel", "very / really"],
       ["om",  "if"],
       ["vor", "why"],
     ];
 
-    // Build a base word dictionary (micro -> English gloss)
-    function buildCoreWordMap(){
+    function buildCoreMicroToGlossMap(){
       const all = []
         .concat(CORE_PRONOUNS, CORE_VERBS, CORE_NOUNS, CORE_ADJ, CORE_FUNC, CORE_PART);
 
-      // If duplicates exist, later entries overwrite earlier entries.
-      // That's okay (e.g., arb verb/noun gloss can be unified).
       const m = Object.create(null);
       for (const [k,v] of all) m[k.toLowerCase()] = v;
       return m;
     }
 
     /******************************************************************
-     * 2) DEFAULT PHRASE OVERRIDES (optional)
-     *    These demonstrate how you can add multi-word meanings.
-     ******************************************************************/
-    const DEFAULT_PHRASE_OVERRIDES = [
-      // ["mi trø vel arb", "I am so bored at work"],
-      // ["mi må mat nu", "I need food now"],
-    ];
-
-    /******************************************************************
-     * 3) USER-EDITABLE PARSERS: "a = b" lines
+     * 2) PARSERS: "a = b" lines
      ******************************************************************/
     function parseEqualsLines(text){
-      // returns array of [lhs, rhs] for valid lines
       const out = [];
       const lines = (text || "").split(/\r?\n/);
       for (let line of lines){
@@ -305,46 +292,55 @@
     }
 
     function normalizePhrase(s){
-      // collapse spaces, lowercase, keep diacritics
       return (s || "")
         .trim()
         .replace(/\s+/g, " ")
         .toLowerCase();
     }
 
+    // Split an English gloss string into usable synonym phrases
+    function glossToSynonyms(gloss){
+      // Handles: "take away / pull / remove", "be / am / are / is"
+      // Returns array of phrases, each normalized (but not empty)
+      const raw = (gloss || "")
+        .replace(/[()]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      // Split on slashes first, then also allow commas
+      const parts = raw
+        .split("/")
+        .flatMap(p => p.split(","))
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      // Keep multi-word synonyms too (e.g., "take away")
+      return parts.map(normalizePhrase).filter(Boolean);
+    }
+
     /******************************************************************
-     * 4) TOKENIZATION (preserve punctuation)
-     *    We split into "wordish" tokens and punctuation tokens.
+     * 3) TOKENIZATION (preserve punctuation)
      ******************************************************************/
     function tokenizeWithPunct(input){
-      // Matches sequences of letters (including diacritics) OR numbers OR punctuation
-      // Keeps punctuation as separate tokens.
+      // word tokens OR numbers OR punctuation
       const re = /([A-Za-zÀ-ÖØ-öø-ÿ]+|[0-9]+|[^\sA-Za-zÀ-ÖØ-öø-ÿ0-9])/g;
       return (input.match(re) || []);
     }
-
     function isWordToken(tok){
       return /^[A-Za-zÀ-ÖØ-öø-ÿ]+$/.test(tok);
     }
-
     function isPunct(tok){
       return !isWordToken(tok) && !/^[0-9]+$/.test(tok);
     }
-
     function joinTokensNicely(tokens){
-      // Put spaces between word/number tokens, but not before punctuation like , . ! ?
       let out = "";
       for (let i = 0; i < tokens.length; i++){
         const t = tokens[i];
         const prev = tokens[i-1];
-
         const needsSpace =
           i > 0 &&
-          // don't put a space before punctuation
           !isPunct(t) &&
-          // don't put space after opening punctuation like "("
           !(prev === "(" || prev === "[" || prev === "{" || prev === "“" || prev === "\"");
-
         if (needsSpace) out += " ";
         out += t;
       }
@@ -352,45 +348,81 @@
     }
 
     /******************************************************************
-     * 5) PHRASE MATCHING (5→4→3→2→1)
+     * 4) BUILD ENGLISH->MICRO PHRASE MAP (the secret sauce)
+     *
+     * Sources:
+     *  A) Custom phrase overrides: english phrase = micro phrase
+     *  B) Core + custom micro word meanings: micro = english gloss
+     *     We invert gloss synonyms into phrase entries (1..5+ words).
+     *
+     * Longest match wins (5→1).
      ******************************************************************/
-    function translateMicroToEnglish(text, phraseMap, wordMap){
-      const rawTokens = tokenizeWithPunct(text);
-      const tokens = rawTokens.map(t => t); // copy
+    function buildEnglishToMicroPhraseMap(customPhrasesText, customWordsText){
+      const map = Object.create(null);
 
-      // We'll build a "word-only" view for phrase matching, but keep punctuation in output.
-      // Strategy:
-      // - Walk through tokens.
-      // - When at a word token, attempt to match phrases spanning WORD TOKENS only,
-      //   skipping punctuation tokens in between? (We will NOT skip punctuation for phrases to keep it simple.)
-      // - Practical: phrase matching occurs on contiguous word tokens separated by spaces only.
-      //
-      // To enforce that, we first create a simplified array of word tokens and an index mapping.
-      const wordTokens = [];
-      const wordIndexToTokenIndex = [];
-      for (let i=0; i<tokens.length; i++){
-        if (isWordToken(tokens[i])) {
-          wordIndexToTokenIndex.push(i);
-          wordTokens.push(tokens[i]);
+      // A) User phrase overrides: english -> micro
+      for (const [lhs, rhs] of parseEqualsLines(customPhrasesText)){
+        map[normalizePhrase(lhs)] = rhs.trim();
+      }
+
+      // B) Invert micro->gloss into english phrases -> micro word
+      const coreMicroToGloss = buildCoreMicroToGlossMap();
+
+      // Collect micro->gloss lines from BOTH core and customWords box
+      // For customWords: allow multiple lines same micro word; we harvest ALL synonyms from ALL lines.
+      const microToGlossList = [];
+
+      // core
+      for (const micro in coreMicroToGloss){
+        microToGlossList.push([micro, coreMicroToGloss[micro]]);
+      }
+      // custom words
+      for (const [microRaw, gloss] of parseEqualsLines(customWordsText)){
+        microToGlossList.push([microRaw.toLowerCase().trim(), gloss]);
+      }
+
+      for (const [micro, gloss] of microToGlossList){
+        const syns = glossToSynonyms(gloss);
+        for (const s of syns){
+          // Do not overwrite explicit phrase overrides
+          if (map[s] === undefined){
+            map[s] = micro;
+          }
         }
       }
 
-      let usedPhrases = 0;
-      let usedWords = 0;
+      return map;
+    }
 
-      // Translate in word-token space, then rebuild into token space
+    /******************************************************************
+     * 5) ENGLISH -> MICRO TRANSLATION
+     *    - Works in WORD token space
+     *    - Tries 5-word clusters down to 1
+     *    - Unknown words pass through
+     ******************************************************************/
+    function translateEnglishToMicro(text, engToMicroMap){
+      const rawTokens = tokenizeWithPunct(text);
+      const tokens = rawTokens.slice();
+
+      const wordTokens = [];
+      for (let i=0; i<tokens.length; i++){
+        if (isWordToken(tokens[i])) wordTokens.push(tokens[i]);
+      }
+
+      let usedPhrases = 0;
+      let usedChunks = 0;
+
       const outWordTokens = [];
-      for (let wi = 0; wi < wordTokens.length; ){
+      for (let wi=0; wi<wordTokens.length; ){
         let matched = false;
 
-        // Try n-grams from 5 down to 1
-        for (let n = 5; n >= 1; n--){
+        for (let n=5; n>=1; n--){
           if (wi + n > wordTokens.length) continue;
 
-          const slice = wordTokens.slice(wi, wi + n);
+          const slice = wordTokens.slice(wi, wi+n);
           const key = normalizePhrase(slice.join(" "));
-          if (phraseMap[key]){
-            outWordTokens.push(phraseMap[key]);
+          if (engToMicroMap[key]){
+            outWordTokens.push(engToMicroMap[key]);
             wi += n;
             usedPhrases++;
             matched = true;
@@ -399,21 +431,20 @@
         }
 
         if (!matched){
+          // Try single token after normalizing common contractions-ish
           const w = wordTokens[wi];
-          const low = w.toLowerCase();
-          if (wordMap[low]){
-            outWordTokens.push(wordMap[low]);
-            usedWords++;
+          const key1 = normalizePhrase(w);
+          if (engToMicroMap[key1]){
+            outWordTokens.push(engToMicroMap[key1]);
+            usedChunks++;
           } else {
-            outWordTokens.push(w); // unknown word passthrough
+            outWordTokens.push(w); // passthrough unknown
           }
           wi++;
         }
       }
 
-      // Now rebuild the full token list:
-      // Replace each original word token with the corresponding translated word/phrase.
-      // Non-word tokens (punctuation) pass through.
+      // Rebuild full token stream, swapping each word token with translated token
       const outTokens = [];
       let outWi = 0;
       for (let i=0; i<tokens.length; i++){
@@ -424,17 +455,14 @@
         }
       }
 
-      // Join. (Note: phrase outputs may contain spaces; joinTokensNicely handles this okay.)
-      const joined = joinTokensNicely(outTokens);
-
       return {
-        text: joined,
-        stats: { usedPhrases, usedWords }
+        text: joinTokensNicely(outTokens),
+        stats: { usedPhrases, usedChunks }
       };
     }
 
     /******************************************************************
-     * 6) WIRE UP UI
+     * 6) UI WIRING
      ******************************************************************/
     const inputEl = document.getElementById("input");
     const outputEl = document.getElementById("output");
@@ -443,53 +471,23 @@
     const wordsEl = document.getElementById("customWords");
     const corePreviewEl = document.getElementById("corePreview");
 
-    // Seed the custom boxes with helpful examples (you can delete)
+    // Seed examples (delete if you want)
     phrasesEl.value =
-`# Add phrase overrides here (2+ words).
-# Format: micro phrase = English phrase
+`# Add phrase overrides here (English -> micro).
+# Format: english phrase = micro phrase
 # Examples:
-mi trø vel arb = I am so bored at work
-mi må mat nu = I need food now
-mi tak bil ny for mi ung = I bought a new car for my daughter`;
+i am so bored at work = mi trø vel arb
+i need food now = mi må mat nu
+i bought a new car for my daughter = mi tak bil ny for mi ung`;
 
     wordsEl.value =
-`# Add single-word overrides/additions here.
-# Format: word = meaning
+`# Add/extend micro meanings here (micro -> English).
+# Format: micro = english meaning(s)
 # Example (expanding dra later):
 dra = take away / pull
 dra = take away / pull / remove`;
 
-    function buildPhraseMap(){
-      const m = Object.create(null);
-
-      // Defaults (optional)
-      for (const [k,v] of DEFAULT_PHRASE_OVERRIDES){
-        m[normalizePhrase(k)] = v;
-      }
-
-      // User phrases
-      for (const [lhs, rhs] of parseEqualsLines(phrasesEl.value)){
-        m[normalizePhrase(lhs)] = rhs;
-      }
-      return m;
-    }
-
-    function buildWordMap(){
-      // core first, then user overrides
-      const core = buildCoreWordMap();
-      const user = Object.create(null);
-
-      // Important: allow multiple lines for same word; last wins.
-      for (const [lhs, rhs] of parseEqualsLines(wordsEl.value)){
-        user[lhs.toLowerCase().trim()] = rhs;
-      }
-
-      return Object.assign(core, user);
-    }
-
     function updateCorePreview(){
-      const core = buildCoreWordMap();
-      // pretty print core sections
       const sections = [
         ["PRONOUNS", CORE_PRONOUNS],
         ["VERBS", CORE_VERBS],
@@ -505,31 +503,31 @@ dra = take away / pull / remove`;
         out += arr.map(([k,v]) => `  ${k.padEnd(5," ")} = ${v}`).join("\n");
         out += "\n\n";
       }
-      // also show effective overrides count
-      const customWords = parseEqualsLines(wordsEl.value).length;
-      const customPhrases = parseEqualsLines(phrasesEl.value).length;
+
+      const customWordLines = parseEqualsLines(wordsEl.value).length;
+      const customPhraseLines = parseEqualsLines(phrasesEl.value).length;
       out += `# Custom entries currently loaded:\n`;
-      out += `#   phrase lines: ${customPhrases}\n`;
-      out += `#   word lines:   ${customWords}\n`;
+      out += `#   phrase lines (English->micro): ${customPhraseLines}\n`;
+      out += `#   word lines (micro->English):   ${customWordLines}\n`;
+      out += `# Matching order: 5-word clusters → 4 → 3 → 2 → 1\n`;
+
       corePreviewEl.textContent = out.trim();
     }
 
     function runTranslate(){
-      const phraseMap = buildPhraseMap();
-      const wordMap = buildWordMap();
-
-      const res = translateMicroToEnglish(inputEl.value, phraseMap, wordMap);
+      const engToMicroMap = buildEnglishToMicroPhraseMap(phrasesEl.value, wordsEl.value);
+      const res = translateEnglishToMicro(inputEl.value, engToMicroMap);
       outputEl.value = res.text;
 
       statusEl.innerHTML =
-        `<strong>Matches:</strong> ${res.stats.usedPhrases} phrase(s), ${res.stats.usedWords} word(s).`;
+        `<strong>Matches:</strong> ${res.stats.usedPhrases} phrase(s), ${res.stats.usedChunks} chunk(s).`;
     }
 
     document.getElementById("translateBtn").addEventListener("click", runTranslate);
     document.getElementById("clearBtn").addEventListener("click", () => {
       inputEl.value = "";
       outputEl.value = "";
-      statusEl.innerHTML = `<strong>Matches:</strong> 0 phrase(s), 0 word(s).`;
+      statusEl.innerHTML = `<strong>Matches:</strong> 0 phrase(s), 0 chunk(s).`;
       inputEl.focus();
     });
     document.getElementById("copyBtn").addEventListener("click", async () => {
@@ -541,7 +539,7 @@ dra = take away / pull / remove`;
       }
     });
 
-    // Live update when dictionaries change
+    // Live update
     phrasesEl.addEventListener("input", () => { updateCorePreview(); runTranslate(); });
     wordsEl.addEventListener("input", () => { updateCorePreview(); runTranslate(); });
     inputEl.addEventListener("input", () => { runTranslate(); });
