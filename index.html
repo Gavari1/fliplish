@@ -3,552 +3,179 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nordic Micro Translator (100-word core)</title>
+  <title>English → Conlang Dictionary</title>
   <style>
-    :root{
-      --bg:#0b132b;
-      --panel:#ffffff;
-      --text:#0f172a;
-      --muted:#64748b;
-      --border:rgba(15,23,42,.14);
-      --accent:#38bdf8;
-      --shadow:0 18px 45px rgba(0,0,0,.18);
-    }
-    *{box-sizing:border-box}
-    body{
-      margin:0; padding:24px;
-      font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-      background:linear-gradient(135deg,#0b132b 0%, #0f2a4a 55%, #0b132b 100%);
-      color:#fff;
-    }
-    .wrap{max-width:1100px;margin:0 auto;display:grid;gap:18px}
-    h1{font-size:20px;margin:0 0 6px 0}
-    p{margin:0 0 12px 0;color:#cbd5e1}
-    .grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}
-    @media (max-width: 980px){.grid{grid-template-columns:1fr}}
-    .card{
-      background:var(--panel);
-      color:var(--text);
-      border:1px solid var(--border);
-      border-radius:16px;
-      box-shadow:var(--shadow);
-      padding:16px;
-    }
-    .label{font-weight:650;font-size:12px;letter-spacing:.04em;color:#334155;text-transform:uppercase;margin:4px 0 8px}
-    textarea{
-      width:100%;
-      min-height:160px;
-      resize:vertical;
-      border-radius:12px;
-      border:1px solid var(--border);
-      padding:12px;
-      font-size:14px;
-      line-height:1.35;
-      outline:none;
-    }
-    textarea:focus{border-color:rgba(56,189,248,.65); box-shadow:0 0 0 4px rgba(56,189,248,.18)}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    button{
-      border:0;
-      background:var(--accent);
-      color:#00111f;
-      padding:10px 14px;
-      border-radius:12px;
-      font-weight:700;
-      cursor:pointer;
-    }
-    button.secondary{
-      background:#e2e8f0;
-      color:#0f172a;
-    }
-    .hint{font-size:12px;color:var(--muted);margin-top:8px}
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
-    .split{
-      display:grid;
-      grid-template-columns:1fr;
-      gap:12px;
-    }
-    .small{min-height:120px}
-    .status{
-      font-size:12px;
-      color:#0f172a;
-      background:#f1f5f9;
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:10px 12px;
-    }
-    .status strong{color:#0f172a}
+    :root { color-scheme: dark; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; background:#0b0f17; color:#e8eefc; }
+    h1 { margin: 0 0 10px; font-size: 22px; }
+    .sub { opacity: .8; margin: 0 0 18px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom: 14px; }
+    input, select, button { background:#121a2a; color:#e8eefc; border:1px solid #24314d; border-radius:10px; padding:10px 12px; font-size:14px; }
+    input { flex: 1 1 260px; }
+    button { cursor:pointer; }
+    button:hover { border-color:#3b4f7f; }
+    .card { background:#0f1626; border:1px solid #24314d; border-radius:14px; padding:14px; margin-top: 14px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #1f2b44; vertical-align:top; }
+    th { font-size:12px; letter-spacing:.08em; text-transform:uppercase; opacity:.8; }
+    .pill { display:inline-block; padding:2px 10px; border:1px solid #2a3a5e; border-radius:999px; font-size:12px; opacity:.9; }
+    .muted { opacity:.75; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .footer { margin-top:14px; opacity:.7; font-size:12px; }
+    .right { text-align:right; }
+    .tiny { font-size:12px; opacity:.8; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div>
-      <h1>Nordic Micro Translator (English → micro)</h1>
-      <p>
-        Translates <span class="mono">English → micro</span>.
-        It checks phrase clusters in this order: <strong>5 words → 4 → 3 → 2 → 1</strong>.
-        You can add/extend meanings by adding new lines in the dictionaries.
-      </p>
-    </div>
+  <h1>Dictionary (English → Conlang)</h1>
+  <p class="sub">Not a translator. Just a searchable, alphabetical lexicon.</p>
 
-    <div class="grid">
-      <div class="card">
-        <div class="label">Input (English)</div>
-        <textarea id="input" class="mono" placeholder="Example: I need food now, I am very bored at work"></textarea>
+  <div class="row">
+    <input id="q" type="search" placeholder="Search English (e.g., 'sleep') or conlang (e.g., 'nna')" autocomplete="off" />
+    <select id="mode" aria-label="Search mode">
+      <option value="both" selected>Search: English + Conlang</option>
+      <option value="en">Search: English only</option>
+      <option value="cl">Search: Conlang only</option>
+    </select>
+    <button id="clear">Clear</button>
+  </div>
 
-        <div class="row" style="margin-top:10px">
-          <button id="translateBtn">Translate</button>
-          <button id="clearBtn" class="secondary">Clear</button>
-          <button id="copyBtn" class="secondary">Copy output</button>
-        </div>
-        <div class="hint">
-          Tip: punctuation is preserved. Matching is case-insensitive.
-        </div>
-      </div>
+  <div class="row">
+    <span class="pill">Sorted by: <span class="mono">English (A→Z)</span></span>
+    <span class="pill">Entries: <span id="count" class="mono">0</span></span>
+    <span class="pill">Showing: <span id="showing" class="mono">0</span></span>
+  </div>
 
-      <div class="card">
-        <div class="label">Output (micro language)</div>
-        <textarea id="output" class="mono" readonly placeholder="Translation appears here..."></textarea>
-        <div id="status" class="status" style="margin-top:10px">
-          <strong>Matches:</strong> 0 phrase(s), 0 chunk(s).
-        </div>
-      </div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="label">Custom phrase overrides (optional)</div>
-        <div class="split">
-          <textarea id="customPhrases" class="mono small" spellcheck="false"></textarea>
-          <div class="hint">
-            Format: <span class="mono">english phrase = micro phrase</span><br/>
-            One per line. Use 2–5+ words. Longest match wins (5→1).<br/>
-            Example: <span class="mono">i am so bored at work = mi trø vel arb</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="label">Custom micro word meanings (optional)</div>
-        <div class="split">
-          <textarea id="customWords" class="mono small" spellcheck="false"></textarea>
-          <div class="hint">
-            Format: <span class="mono">micro = english meaning(s)</span><br/>
-            Add extra English synonyms by adding a new line for the same micro word.<br/>
-            Example:<br/>
-            <span class="mono">dra = take away / pull</span><br/>
-            <span class="mono">dra = take away / pull / remove</span><br/>
-            (Last line wins for that micro word’s meaning string, but we harvest all synonyms from all lines.)
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="label">Built-in 100-word core (micro → English gloss)</div>
-      <div class="hint">
-        This is the base lexicon. The translator automatically inverts it to go English → micro.
-        (Also: <span class="mono">hond</span> = “hand” so <span class="mono">han</span> can stay “he”.)
-      </div>
-      <pre class="mono" style="white-space:pre-wrap;margin:10px 0 0 0; color:#0f172a; background:#f8fafc; border:1px solid var(--border); padding:12px; border-radius:12px" id="corePreview"></pre>
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:35%;">English</th>
+          <th style="width:20%;">Conlang</th>
+          <th>Notes</th>
+          <th class="right" style="width:15%;">Tags</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="footer tiny">
+      Edit the <span class="mono">LEXICON</span> array in the code to add words (keep English A→Z).
     </div>
   </div>
 
-  <script>
-    /******************************************************************
-     * 1) BUILT-IN CORE (100 words) : micro -> English gloss
-     ******************************************************************/
+<script>
+  // ✅ Dictionary data (English alphabetical). Edit/add entries here.
+  // Fields:
+  //  - en: English headword (used for sorting)
+  //  - cl: conlang word
+  //  - notes: optional clarifications / usage
+  //  - tags: array of categories
+  const LEXICON = [
+    { en: "after",  cl: "nra", notes: "", tags: ["time"] },
+    { en: "and",    cl: "sap", notes: "Connector / conjunction.", tags: ["connector"] },
+    { en: "bed",    cl: "ga",  notes: "", tags: ["object"] },
+    { en: "before", cl: "poi", notes: "", tags: ["time"] },
+    { en: "become / get", cl: "pwe", notes: "State-change verb.", tags: ["verb"] },
+    { en: "dream",  cl: "nme", notes: "Can be used as verb or concept.", tags: ["mental"] },
+    { en: "good",   cl: "ka",  notes: "", tags: ["state"] },
+    { en: "he / she", cl: "ua", notes: "3rd person singular.", tags: ["pronoun"] },
+    { en: "I / me", cl: "owa", notes: "1st person singular.", tags: ["pronoun"] },
+    { en: "lay down", cl: "kwo", notes: "Verb.", tags: ["verb"] },
+    { en: "night",  cl: "a",   notes: "", tags: ["time"] },
+    { en: "no / not / negative", cl: "noa", notes: "Negation marker.", tags: ["grammar"] },
+    { en: "pillow", cl: "teq", notes: "Pronounced 'tek'.", tags: ["object"] },
+    { en: "question marker", cl: "uta", notes: "Sentence-final question particle.", tags: ["grammar"] },
+    { en: "sleep",  cl: "nna", notes: "Verb.", tags: ["verb"] },
+    { en: "they / you all", cl: "ena", notes: "Plural 3rd person / 'you all'.", tags: ["pronoun"] },
+    { en: "tired",  cl: "jna", notes: "", tags: ["state"] },
+    { en: "today",  cl: "ani", notes: "", tags: ["time"] },
+    { en: "wake up", cl: "ba", notes: "Verb.", tags: ["verb"] },
+    { en: "we",     cl: "vja", notes: "1st person plural.", tags: ["pronoun"] },
+    { en: "wish",   cl: "lno", notes: "Verb.", tags: ["verb"] },
+    { en: "you",    cl: "ma",  notes: "2nd person singular.", tags: ["pronoun"] },
+  ];
 
-    // PRONOUNS (8)
-    const CORE_PRONOUNS = [
-      ["mi",  "I / me / my"],
-      ["tu",  "you / your / yours"],
-      ["han", "he / him / his"],
-      ["sa",  "she / her / hers"],
-      ["et",  "it / its"],
-      ["vi",  "we / us / our / ours"],
-      ["de",  "they / them / their / theirs"],
-      ["alt", "all / everyone / everything"],
-    ];
+  // --- App code (no frameworks) ---
+  const q = document.getElementById("q");
+  const mode = document.getElementById("mode");
+  const clearBtn = document.getElementById("clear");
+  const rowsEl = document.getElementById("rows");
+  const countEl = document.getElementById("count");
+  const showingEl = document.getElementById("showing");
 
-    // VERBS (18)
-    const CORE_VERBS = [
-      ["es",   "be / am / are / is / exist"],
-      ["har",  "have / has"],
-      ["gor",  "do / does"],
-      ["far",  "go / goes"],
-      ["kom",  "come / comes"],
-      ["lag",  "make / made / create"],
-      ["tak",  "get / got / take / took / buy / bought"],
-      ["giv",  "give / gave"],
-      ["dra",  "take away / pull"],
-      ["sen",  "see / saw"],
-      ["tal",  "say / said / speak"],
-      ["vit",  "know / knew"],
-      ["ten",  "think / thought"],
-      ["vil",  "want / wants"],
-      ["må",   "need / needs / must"],
-      ["lik",  "like / likes"],
-      ["arb",  "work / works (verb)"],
-      ["hjel", "help / helps"],
-    ];
+  function normalize(s) {
+    return (s ?? "")
+      .toString()
+      .trim()
+      .toLowerCase();
+  }
 
-    // NOUNS (22)
-    const CORE_NOUNS = [
-      ["man",  "person / people"],
-      ["kar",  "man / male"],
-      ["vin",  "woman / female"],
-      ["ung",  "child / kid / daughter / son"],
-      ["sak",  "thing / stuff"],
-      ["stad", "place / location"],
-      ["hem",  "home / house"],
-      ["arb",  "work / job (noun)"],
-      ["tid",  "time"],
-      ["dag",  "day"],
-      ["nat",  "night"],
-      ["mat",  "food / breakfast / lunch / dinner"],
-      ["vat",  "water"],
-      ["pen",  "money / cash"],
-      ["bil",  "car"],
-      ["veg",  "road / street"],
-      ["kro",  "body"],
-      ["hond", "hand"],
-      ["hov",  "head"],
-      ["fel",  "problem / issue"],
-      ["vei",  "way / path"],
-      ["liv",  "life"],
-    ];
+  function escapeHtml(str) {
+    return (str ?? "").toString()
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
 
-    // DESCRIPTORS (16)
-    const CORE_ADJ = [
-      ["bra",  "good / great / ok"],
-      ["ill",  "bad"],
-      ["stor", "big / large"],
-      ["lil",  "small / little"],
-      ["ny",   "new"],
-      ["gam",  "old"],
-      ["het",  "hot / warm"],
-      ["kal",  "cold"],
-      ["snar", "fast / quick"],
-      ["seg",  "slow"],
-      ["let",  "easy"],
-      ["tung", "hard / heavy"],
-      ["trø",  "tired / bored / drained"],
-      ["full", "full"],
-      ["tom",  "empty"],
-      ["sam",  "same"],
-      ["ned", "down"],
-    ];
+  function sortLexicon(list) {
+    return [...list].sort((a,b) => a.en.localeCompare(b.en, "en", { sensitivity: "base" }));
+  }
 
-    // FUNCTION WORDS (12)
-    const CORE_FUNC = [
-      ["den", "this"],
-      ["dat", "that"],
-      ["her", "here"],
-      ["der", "there"],
-      ["nu",  "now"],
-      ["før", "before"],
-      ["eft", "after"],
-      ["med", "with"],
-      ["for", "for"],
-      ["fra", "from"],
-      ["ne",  "no / not / don't / doesnt / do not"],
-      ["og",  "and"],
-      ["vind", "wind / breeze"],
-    ];
+  function matches(entry, query, searchMode) {
+    if (!query) return true;
+    const en = normalize(entry.en);
+    const cl = normalize(entry.cl);
+    const notes = normalize(entry.notes);
+    const tags = normalize((entry.tags || []).join(" "));
+    if (searchMode === "en") return en.includes(query);
+    if (searchMode === "cl") return cl.includes(query);
+    // both:
+    return en.includes(query) || cl.includes(query) || notes.includes(query) || tags.includes(query);
+  }
 
-    // PARTICLES (4)
-    const CORE_PART = [
-      ["ka",  "question / ?"],
-      ["vel", "very / really"],
-      ["om",  "if"],
-      ["vor", "why"],
-    ];
+  function render(list) {
+    rowsEl.innerHTML = "";
+    showingEl.textContent = String(list.length);
 
-    function buildCoreMicroToGlossMap(){
-      const all = []
-        .concat(CORE_PRONOUNS, CORE_VERBS, CORE_NOUNS, CORE_ADJ, CORE_FUNC, CORE_PART);
-
-      const m = Object.create(null);
-      for (const [k,v] of all) m[k.toLowerCase()] = v;
-      return m;
+    if (list.length === 0) {
+      rowsEl.innerHTML = `<tr><td colspan="4" class="muted">No matches.</td></tr>`;
+      return;
     }
 
-    /******************************************************************
-     * 2) PARSERS: "a = b" lines
-     ******************************************************************/
-    function parseEqualsLines(text){
-      const out = [];
-      const lines = (text || "").split(/\r?\n/);
-      for (let line of lines){
-        line = line.trim();
-        if (!line || line.startsWith("#") || line.startsWith("//")) continue;
-        const idx = line.indexOf("=");
-        if (idx === -1) continue;
-        const lhs = line.slice(0, idx).trim();
-        const rhs = line.slice(idx + 1).trim();
-        if (!lhs || !rhs) continue;
-        out.push([lhs, rhs]);
-      }
-      return out;
+    for (const e of list) {
+      const tags = (e.tags || []).map(t => `<span class="pill mono">${escapeHtml(t)}</span>`).join(" ");
+      rowsEl.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td><span class="mono">${escapeHtml(e.en)}</span></td>
+          <td><span class="mono"><strong>${escapeHtml(e.cl)}</strong></span></td>
+          <td class="muted">${escapeHtml(e.notes || "")}</td>
+          <td class="right">${tags}</td>
+        </tr>
+      `);
     }
+  }
 
-    function normalizePhrase(s){
-      return (s || "")
-        .trim()
-        .replace(/\s+/g, " ")
-        .toLowerCase();
-    }
+  const sorted = sortLexicon(LEXICON);
+  countEl.textContent = String(sorted.length);
+  render(sorted);
 
-    // Split an English gloss string into usable synonym phrases
-    function glossToSynonyms(gloss){
-      // Handles: "take away / pull / remove", "be / am / are / is"
-      // Returns array of phrases, each normalized (but not empty)
-      const raw = (gloss || "")
-        .replace(/[()]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+  function update() {
+    const query = normalize(q.value);
+    const m = mode.value;
+    const filtered = sorted.filter(e => matches(e, query, m));
+    render(filtered);
+  }
 
-      // Split on slashes first, then also allow commas
-      const parts = raw
-        .split("/")
-        .flatMap(p => p.split(","))
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      // Keep multi-word synonyms too (e.g., "take away")
-      return parts.map(normalizePhrase).filter(Boolean);
-    }
-
-    /******************************************************************
-     * 3) TOKENIZATION (preserve punctuation)
-     ******************************************************************/
-    function tokenizeWithPunct(input){
-      // word tokens OR numbers OR punctuation
-      const re = /([A-Za-zÀ-ÖØ-öø-ÿ]+|[0-9]+|[^\sA-Za-zÀ-ÖØ-öø-ÿ0-9])/g;
-      return (input.match(re) || []);
-    }
-    function isWordToken(tok){
-      return /^[A-Za-zÀ-ÖØ-öø-ÿ]+$/.test(tok);
-    }
-    function isPunct(tok){
-      return !isWordToken(tok) && !/^[0-9]+$/.test(tok);
-    }
-    function joinTokensNicely(tokens){
-      let out = "";
-      for (let i = 0; i < tokens.length; i++){
-        const t = tokens[i];
-        const prev = tokens[i-1];
-        const needsSpace =
-          i > 0 &&
-          !isPunct(t) &&
-          !(prev === "(" || prev === "[" || prev === "{" || prev === "“" || prev === "\"");
-        if (needsSpace) out += " ";
-        out += t;
-      }
-      return out;
-    }
-
-    /******************************************************************
-     * 4) BUILD ENGLISH->MICRO PHRASE MAP (the secret sauce)
-     *
-     * Sources:
-     *  A) Custom phrase overrides: english phrase = micro phrase
-     *  B) Core + custom micro word meanings: micro = english gloss
-     *     We invert gloss synonyms into phrase entries (1..5+ words).
-     *
-     * Longest match wins (5→1).
-     ******************************************************************/
-    function buildEnglishToMicroPhraseMap(customPhrasesText, customWordsText){
-      const map = Object.create(null);
-
-      // A) User phrase overrides: english -> micro
-      for (const [lhs, rhs] of parseEqualsLines(customPhrasesText)){
-        map[normalizePhrase(lhs)] = rhs.trim();
-      }
-
-      // B) Invert micro->gloss into english phrases -> micro word
-      const coreMicroToGloss = buildCoreMicroToGlossMap();
-
-      // Collect micro->gloss lines from BOTH core and customWords box
-      // For customWords: allow multiple lines same micro word; we harvest ALL synonyms from ALL lines.
-      const microToGlossList = [];
-
-      // core
-      for (const micro in coreMicroToGloss){
-        microToGlossList.push([micro, coreMicroToGloss[micro]]);
-      }
-      // custom words
-      for (const [microRaw, gloss] of parseEqualsLines(customWordsText)){
-        microToGlossList.push([microRaw.toLowerCase().trim(), gloss]);
-      }
-
-      for (const [micro, gloss] of microToGlossList){
-        const syns = glossToSynonyms(gloss);
-        for (const s of syns){
-          // Do not overwrite explicit phrase overrides
-          if (map[s] === undefined){
-            map[s] = micro;
-          }
-        }
-      }
-
-      return map;
-    }
-
-    /******************************************************************
-     * 5) ENGLISH -> MICRO TRANSLATION
-     *    - Works in WORD token space
-     *    - Tries 5-word clusters down to 1
-     *    - Unknown words pass through
-     ******************************************************************/
-    function translateEnglishToMicro(text, engToMicroMap){
-      const rawTokens = tokenizeWithPunct(text);
-      const tokens = rawTokens.slice();
-
-      const wordTokens = [];
-      for (let i=0; i<tokens.length; i++){
-        if (isWordToken(tokens[i])) wordTokens.push(tokens[i]);
-      }
-
-      let usedPhrases = 0;
-      let usedChunks = 0;
-
-      const outWordTokens = [];
-      for (let wi=0; wi<wordTokens.length; ){
-        let matched = false;
-
-        for (let n=5; n>=1; n--){
-          if (wi + n > wordTokens.length) continue;
-
-          const slice = wordTokens.slice(wi, wi+n);
-          const key = normalizePhrase(slice.join(" "));
-          if (engToMicroMap[key]){
-            outWordTokens.push(engToMicroMap[key]);
-            wi += n;
-            usedPhrases++;
-            matched = true;
-            break;
-          }
-        }
-
-        if (!matched){
-          // Try single token after normalizing common contractions-ish
-          const w = wordTokens[wi];
-          const key1 = normalizePhrase(w);
-          if (engToMicroMap[key1]){
-            outWordTokens.push(engToMicroMap[key1]);
-            usedChunks++;
-          } else {
-            outWordTokens.push(w); // passthrough unknown
-          }
-          wi++;
-        }
-      }
-
-      // Rebuild full token stream, swapping each word token with translated token
-      const outTokens = [];
-      let outWi = 0;
-      for (let i=0; i<tokens.length; i++){
-        if (isWordToken(tokens[i])){
-          outTokens.push(outWordTokens[outWi++] ?? tokens[i]);
-        } else {
-          outTokens.push(tokens[i]);
-        }
-      }
-
-      return {
-        text: joinTokensNicely(outTokens),
-        stats: { usedPhrases, usedChunks }
-      };
-    }
-
-    /******************************************************************
-     * 6) UI WIRING
-     ******************************************************************/
-    const inputEl = document.getElementById("input");
-    const outputEl = document.getElementById("output");
-    const statusEl = document.getElementById("status");
-    const phrasesEl = document.getElementById("customPhrases");
-    const wordsEl = document.getElementById("customWords");
-    const corePreviewEl = document.getElementById("corePreview");
-
-    // Seed examples (delete if you want)
-    phrasesEl.value =
-`# Add phrase overrides here (English -> micro).
-# Format: english phrase = micro phrase
-# Examples:
-i am so bored at work = mi trø vel arb
-i need food now = mi må mat nu
-i bought a new car for my daughter = mi tak bil ny for mi ung`;
-
-    wordsEl.value =
-`# Add/extend micro meanings here (micro -> English).
-# Format: micro = english meaning(s)
-# Example (expanding dra later):
-dra = take away / pull
-dra = take away / pull / remove`;
-
-    function updateCorePreview(){
-      const sections = [
-        ["PRONOUNS", CORE_PRONOUNS],
-        ["VERBS", CORE_VERBS],
-        ["NOUNS", CORE_NOUNS],
-        ["DESCRIPTORS", CORE_ADJ],
-        ["FUNCTION WORDS", CORE_FUNC],
-        ["PARTICLES", CORE_PART],
-      ];
-
-      let out = "";
-      for (const [name, arr] of sections){
-        out += `${name}\n`;
-        out += arr.map(([k,v]) => `  ${k.padEnd(5," ")} = ${v}`).join("\n");
-        out += "\n\n";
-      }
-
-      const customWordLines = parseEqualsLines(wordsEl.value).length;
-      const customPhraseLines = parseEqualsLines(phrasesEl.value).length;
-      out += `# Custom entries currently loaded:\n`;
-      out += `#   phrase lines (English->micro): ${customPhraseLines}\n`;
-      out += `#   word lines (micro->English):   ${customWordLines}\n`;
-      out += `# Matching order: 5-word clusters → 4 → 3 → 2 → 1\n`;
-
-      corePreviewEl.textContent = out.trim();
-    }
-
-    function runTranslate(){
-      const engToMicroMap = buildEnglishToMicroPhraseMap(phrasesEl.value, wordsEl.value);
-      const res = translateEnglishToMicro(inputEl.value, engToMicroMap);
-      outputEl.value = res.text;
-
-      statusEl.innerHTML =
-        `<strong>Matches:</strong> ${res.stats.usedPhrases} phrase(s), ${res.stats.usedChunks} chunk(s).`;
-    }
-
-    document.getElementById("translateBtn").addEventListener("click", runTranslate);
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      inputEl.value = "";
-      outputEl.value = "";
-      statusEl.innerHTML = `<strong>Matches:</strong> 0 phrase(s), 0 chunk(s).`;
-      inputEl.focus();
-    });
-    document.getElementById("copyBtn").addEventListener("click", async () => {
-      try{
-        await navigator.clipboard.writeText(outputEl.value || "");
-        statusEl.innerHTML = `<strong>Copied:</strong> output text to clipboard.`;
-      } catch {
-        statusEl.innerHTML = `<strong>Copy failed:</strong> your browser blocked clipboard access.`;
-      }
-    });
-
-    // Live update
-    phrasesEl.addEventListener("input", () => { updateCorePreview(); runTranslate(); });
-    wordsEl.addEventListener("input", () => { updateCorePreview(); runTranslate(); });
-    inputEl.addEventListener("input", () => { runTranslate(); });
-
-    // init
-    updateCorePreview();
-    runTranslate();
-  </script>
+  q.addEventListener("input", update);
+  mode.addEventListener("change", update);
+  clearBtn.addEventListener("click", () => {
+    q.value = "";
+    mode.value = "both";
+    update();
+    q.focus();
+  });
+</script>
 </body>
 </html>
