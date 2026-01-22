@@ -166,7 +166,7 @@
     .btn{
       border: 1px solid rgba(255,255,255,0.18);
       background: rgba(255,255,255,0.06);
-      color: rgba(255,255,255,0.92);
+      color: var(--text);
       padding: 10px 12px;
       border-radius: 12px;
       font-size: 13px;
@@ -373,6 +373,16 @@
         if (VOWELS.has(ch)) break;
         i++;
       }
+
+      // OPTION A FIX (vowelless fallback):
+      // If there is no AEIOU anywhere in the word, don't let the cluster swallow the whole word.
+      // Instead, use only the initial consonant cluster (same scan) BUT capped so that at least
+      // one character remains in the word body.
+      if (i === coreLower.length) {
+        if (coreLower.length <= 1) return coreLower; // single-letter word: keep as cluster
+        return coreLower.slice(0, coreLower.length - 1); // keep last char as body (e.g., thy -> th, gym -> g)
+      }
+
       return coreLower.slice(0, i); // could be "" if starts with vowel
     }
 
