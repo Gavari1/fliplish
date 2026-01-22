@@ -2,196 +2,481 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>English → Conlang Dictionary</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ALA-AY Translator</title>
   <style>
-    /* Clean + basic */
-    :root { color-scheme: dark; }
+    :root{
+      --bg: #0b1220;
+      --card: rgba(255,255,255,0.06);
+      --card2: rgba(255,255,255,0.08);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.70);
+      --muted2: rgba(255,255,255,0.55);
+      --border: rgba(255,255,255,0.14);
+      --shadow: 0 18px 60px rgba(0,0,0,0.35);
+      --radius: 18px;
+      --radius2: 14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      --accent: #7dd3fc; /* no hard requirement; just a nice glow */
+      --accent2: #a78bfa;
+      --ok: #86efac;
+      --warn: #fbbf24;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
     body{
-      margin:0; padding:20px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background:#0b0f17; color:#e8eefc;
+      margin:0;
+      font-family: var(--sans);
+      color: var(--text);
+      background:
+        radial-gradient(1200px 800px at 20% 10%, rgba(125,211,252,0.18), transparent 55%),
+        radial-gradient(900px 700px at 80% 25%, rgba(167,139,250,0.16), transparent 55%),
+        radial-gradient(800px 700px at 45% 90%, rgba(34,197,94,0.12), transparent 60%),
+        var(--bg);
     }
-    h1{ margin:0 0 6px; font-size:20px; }
-    .sub{ margin:0 0 14px; opacity:.75; font-size:13px; }
 
-    .bar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin: 0 0 14px; }
-    input, select, button{
-      background:#0f1626; color:#e8eefc;
-      border:1px solid #22314f; border-radius:10px;
-      padding:10px 12px; font-size:14px;
-    }
-    input{ flex:1 1 280px; }
-    button{ cursor:pointer; }
-    button:hover{ border-color:#3a5488; }
-
-    .meta{ font-size:12px; opacity:.75; margin-bottom:10px; }
-
-    /* Table */
     .wrap{
-      border:1px solid #22314f; border-radius:12px;
-      overflow:hidden; background:#0f1626;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 28px 18px 44px;
     }
-    table{ width:100%; border-collapse:collapse; }
-    thead th{
-      text-align:left; font-size:12px; letter-spacing:.08em; text-transform:uppercase;
-      padding:12px 12px; background:#0d1423; border-bottom:1px solid #22314f;
-      opacity:.85;
-    }
-    tbody td{
-      padding:12px 12px; border-bottom:1px solid #1b2944; vertical-align:top;
-      font-size:14px;
-    }
-    tbody tr:last-child td{ border-bottom:none; }
 
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .muted{ opacity:.75; }
-    .right{ text-align:right; }
+    header{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      margin-bottom: 18px;
+    }
 
-    /* Small screens: keep it readable */
-    @media (max-width: 560px){
-      thead{ display:none; }
-      table, tbody, tr, td{ display:block; width:100%; }
-      tbody tr{ border-bottom:1px solid #22314f; }
-      tbody tr:last-child{ border-bottom:none; }
-      tbody td{ border-bottom:none; padding:10px 12px; }
-      tbody td[data-label]::before{
-        content: attr(data-label);
-        display:block; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
-        opacity:.65; margin-bottom:4px;
-      }
+    .title{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width: 260px;
+    }
+
+    .title h1{
+      margin:0;
+      font-size: 26px;
+      letter-spacing: 0.2px;
+      line-height: 1.15;
+    }
+
+    .title p{
+      margin:0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+      max-width: 66ch;
+    }
+
+    .chiprow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
+
+    .chip{
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--muted);
+      backdrop-filter: blur(10px);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      backdrop-filter: blur(14px);
+    }
+
+    .cardHead{
+      padding: 14px 14px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .cardHead .label{
+      font-weight: 650;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      color: rgba(255,255,255,0.88);
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .badge{
+      font-family: var(--mono);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(0,0,0,0.10);
+      color: rgba(255,255,255,0.75);
+      white-space:nowrap;
+    }
+
+    textarea{
+      width: 100%;
+      min-height: 260px;
+      padding: 14px;
+      border: 0;
+      outline: none;
+      resize: vertical;
+      background: transparent;
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      padding: 12px 14px 14px;
+      border-top: 1px solid rgba(255,255,255,0.10);
+      background: rgba(0,0,0,0.10);
+    }
+
+    .btn{
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.92);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor:pointer;
+      transition: transform 0.06s ease, background 0.15s ease, border-color 0.15s ease;
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      user-select:none;
+    }
+    .btn:hover{ background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.26); }
+    .btn:active{ transform: translateY(1px); }
+
+    .btn.primary{
+      background: linear-gradient(135deg, rgba(125,211,252,0.16), rgba(167,139,250,0.14));
+      border-color: rgba(125,211,252,0.38);
+    }
+
+    .btn.good{
+      border-color: rgba(134,239,172,0.35);
+      background: rgba(134,239,172,0.10);
+    }
+
+    .btn.warn{
+      border-color: rgba(251,191,36,0.35);
+      background: rgba(251,191,36,0.10);
+    }
+
+    .row{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .toggle{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+    }
+
+    input[type="checkbox"]{
+      width: 18px;
+      height: 18px;
+      accent-color: #7dd3fc;
+    }
+
+    .rules{
+      margin-top: 16px;
+      padding: 14px 14px 16px;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    code.k{
+      font-family: var(--mono);
+      background: rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.14);
+      padding: 2px 6px;
+      border-radius: 8px;
+      color: rgba(255,255,255,0.88);
+      white-space:nowrap;
+    }
+
+    .toast{
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.75);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.90);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      opacity: 0;
+      pointer-events:none;
+      transition: opacity 0.16s ease, transform 0.16s ease;
+      backdrop-filter: blur(10px);
+    }
+    .toast.show{
+      opacity: 1;
+      transform: translateX(-50%) translateY(-2px);
     }
   </style>
 </head>
+
 <body>
-  <h1>Dictionary (English → Conlang)</h1>
-  <p class="sub">Simple list. Searchable. Keeps notes. Sorted A→Z by English.</p>
-
-  <div class="bar">
-    <input id="q" type="search" placeholder="Search (English or conlang)…" autocomplete="off" />
-    <select id="mode" aria-label="Search mode">
-      <option value="both" selected>English + Conlang</option>
-      <option value="en">English only</option>
-      <option value="cl">Conlang only</option>
-      <option value="notes">Notes only</option>
-    </select>
-    <button id="clear" type="button">Clear</button>
-  </div>
-
-  <div class="meta">
-    Entries: <span id="count" class="mono">0</span> • Showing: <span id="showing" class="mono">0</span>
-  </div>
-
   <div class="wrap">
-    <table>
-      <thead>
-        <tr>
-          <th style="width:36%;">English</th>
-          <th style="width:18%;">Conlang</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
+    <header>
+      <div class="title">
+        <h1>ALA-AY Translator</h1>
+        <p>
+          Deterministic translator using your canon rules:
+          vowels <code class="k">AEIOU</code>, <code class="k">Y</code> is always a consonant,
+          initial consonant cluster <code class="k">C</code> wraps the word as
+          <code class="k">C + ala + word + C + ay</code>.
+          Vowel-start words become <code class="k">word + lay</code>.
+        </p>
+      </div>
+      <div class="chiprow">
+        <div class="chip">Punctuation preserved</div>
+        <div class="chip">Case preserved</div>
+        <div class="chip">Cluster-aware</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card">
+        <div class="cardHead">
+          <div class="label">Input</div>
+          <span class="badge">English → ALA-AY</span>
+        </div>
+        <textarea id="input" spellcheck="false" placeholder="Type or paste text here...&#10;&#10;Example: The boy is playing basketball."></textarea>
+        <div class="toolbar">
+          <button class="btn primary" id="btnTranslate">Translate</button>
+          <button class="btn" id="btnSwap">Swap</button>
+          <button class="btn warn" id="btnClear">Clear</button>
+          <div class="row" style="margin-left:auto;">
+            <label class="toggle" title="Optional legacy rule from earlier ALA-AY versions">
+              <input type="checkbox" id="keepI" checked />
+              Keep “I” unchanged
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="cardHead">
+          <div class="label">Output</div>
+          <span class="badge">ALA-AY</span>
+        </div>
+        <textarea id="output" spellcheck="false" placeholder="Translation appears here..." readonly></textarea>
+        <div class="toolbar">
+          <button class="btn good" id="btnCopy">Copy Output</button>
+          <button class="btn" id="btnExample1">Example</button>
+          <button class="btn" id="btnExample2">Example 2</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="rules">
+      <strong>Canon rules (locked):</strong><br/>
+      1) Vowels are <code class="k">A E I O U</code>. <code class="k">Y</code> is always a consonant.<br/>
+      2) Let <code class="k">C</code> be the initial consonant cluster (all starting consonants up to first vowel).<br/>
+      3) If word starts with vowel → <code class="k">word + lay</code>.<br/>
+      4) If word starts with cluster <code class="k">C</code> → <code class="k">C + ala + word + C + ay</code>.<br/>
+      5) Punctuation + spacing preserved; case preserved (lower / Title / ALL CAPS).
+    </div>
   </div>
 
-<script>
-  // Edit this list. Keep English in any order—code sorts it A→Z automatically.
-  const LEXICON = [
-    { en: "a / an (indefinite article suffix)", cl: "-uo", notes: "Suffix on nouns. Example: ga-uo = a bed." },
-    { en: "after",  cl: "nra", notes: "" },
-    { en: "and",    cl: "sap", notes: "Connector / conjunction." },
-    { en: "bed",    cl: "ga",  notes: "" },
-    { en: "before", cl: "poi", notes: "" },
-    { en: "become / get", cl: "pwe", notes: "State-change verb." },
-    { en: "dream",  cl: "nme", notes: "Can be used as verb or concept." },
-    { en: "future marker", cl: "e", notes: "Grammar. Pre-verbal future marker: e + verb." },
-    { en: "go", cl: "bak", notes: "Verb." },
-    { en: "good",   cl: "ka",  notes: "" },
-    { en: "he / she", cl: "ua", notes: "3rd person singular." },
-    { en: "house", cl: "lan", notes: "Noun." },
-    { en: "I / me", cl: "owa", notes: "1st person singular. Pronouns omitted when subject is already established." },
-    { en: "lay down", cl: "kwo", notes: "Verb." },
-    { en: "night",  cl: "a",   notes: "" },
-    { en: "no / not / negative", cl: "noa", notes: "Negation marker." },
-    { en: "past marker", cl: "o", notes: "Grammar. Pre-verbal past marker: o + verb." },
-    { en: "person", cl: "fu", notes: "Noun." },
-    { en: "pillow", cl: "teq", notes: "Pronounced 'tek'." },
-    { en: "question marker", cl: "uta", notes: "Sentence-final question particle." },
-    { en: "right now", cl: "sa", notes: "comes after verb to show immediate action." },
-    { en: "say / tell", cl: "gri", notes: "Verb." },
-    { en: "sleep",  cl: "nna", notes: "Verb." },
-    { en: "store",  cl: "kia", notes: "" },
-    { en: "the (definite article suffix)", cl: "-u", notes: "Suffix on nouns. Example: ga-u = the bed." },
-    { en: "they / you all", cl: "ena", notes: "Plural 3rd person / 'you all'." },
-    { en: "tired",  cl: "jna", notes: "" },
-    { en: "today",  cl: "ani", notes: "" },
-    { en: "wake up", cl: "ba", notes: "Verb." },
-    { en: "want", cl: "ren", notes: "Verb." },
-    { en: "we",     cl: "vja", notes: "1st person plural." },
-    { en: "well / ok",  cl: "njo", notes: "" },
-    { en: "wish",   cl: "lno", notes: "Wish / desire concept." },
-    { en: "you",    cl: "ma",  notes: "2nd person singular." },
-    { en: "food", cl: "uk", notes: "Noun." }
-  ];
+  <div class="toast" id="toast">Copied!</div>
 
-  const q = document.getElementById("q");
-  const mode = document.getElementById("mode");
-  const clearBtn = document.getElementById("clear");
-  const rowsEl = document.getElementById("rows");
-  const countEl = document.getElementById("count");
-  const showingEl = document.getElementById("showing");
+  <script>
+    const VOWELS = new Set(["a","e","i","o","u"]); // y is always consonant
 
-  const esc = (s) => (s ?? "").toString()
-    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
-
-  const norm = (s) => (s ?? "").toString().trim().toLowerCase();
-
-  const sorted = [...LEXICON].sort((a,b) => a.en.localeCompare(b.en, "en", { sensitivity:"base" }));
-  countEl.textContent = String(sorted.length);
-
-  function match(entry, query, m){
-    if (!query) return true;
-    const EN = norm(entry.en), CL = norm(entry.cl), NO = norm(entry.notes);
-    if (m === "en") return EN.includes(query);
-    if (m === "cl") return CL.includes(query);
-    if (m === "notes") return NO.includes(query);
-    return EN.includes(query) || CL.includes(query) || NO.includes(query);
-  }
-
-  function render(list){
-    showingEl.textContent = String(list.length);
-    if (!list.length){
-      rowsEl.innerHTML = `<tr><td colspan="3" class="muted">No matches.</td></tr>`;
-      return;
+    function detectCaseStyle(word) {
+      // Only letters considered for case style.
+      const letters = word.replace(/[^A-Za-z]/g, "");
+      if (!letters) return "none";
+      if (letters === letters.toUpperCase()) return "upper";
+      if (letters === letters.toLowerCase()) return "lower";
+      // Title case = first letter uppercase, rest lowercase (letters only)
+      const first = letters[0];
+      const rest = letters.slice(1);
+      if (first === first.toUpperCase() && rest === rest.toLowerCase()) return "title";
+      return "mixed";
     }
 
-    rowsEl.innerHTML = list.map(e => `
-      <tr>
-        <td data-label="English"><span class="mono">${esc(e.en)}</span></td>
-        <td data-label="Conlang"><span class="mono"><strong>${esc(e.cl)}</strong></span></td>
-        <td data-label="Notes" class="muted">${esc(e.notes || "")}</td>
-      </tr>
-    `).join("");
-  }
+    function applyCaseStyle(text, style) {
+      if (style === "upper") return text.toUpperCase();
+      if (style === "lower") return text.toLowerCase();
+      if (style === "title") {
+        const lower = text.toLowerCase();
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      }
+      return text; // mixed/none: leave as produced
+    }
 
-  function update(){
-    const query = norm(q.value);
-    const m = mode.value;
-    render(sorted.filter(e => match(e, query, m)));
-  }
+    function splitPunctuation(token) {
+      // Preserve leading/trailing non-letters (keeps quotes, parentheses, commas, etc.)
+      // Keep internal apostrophes/hyphens as part of the word body.
+      const m = token.match(/^([^A-Za-z]*)([A-Za-z][A-Za-z'’-]*)([^A-Za-z]*)$/);
+      if (!m) return null;
+      return { lead: m[1], core: m[2], trail: m[3] };
+    }
 
-  q.addEventListener("input", update);
-  mode.addEventListener("change", update);
-  clearBtn.addEventListener("click", () => {
-    q.value = "";
-    mode.value = "both";
-    update();
-    q.focus();
-  });
+    function initialClusterLower(coreLower) {
+      // cluster = all starting consonant letters before first vowel (AEIOU), y is consonant.
+      let i = 0;
+      while (i < coreLower.length) {
+        const ch = coreLower[i];
+        if (!/[a-z]/.test(ch)) break; // safety
+        if (VOWELS.has(ch)) break;
+        i++;
+      }
+      return coreLower.slice(0, i); // could be "" if starts with vowel
+    }
 
-  render(sorted);
-</script>
+    function translateWordALAAY(core, keepI) {
+      // core is letters + optional apostrophes
+      if (!core) return core;
+
+      // Optional: keep "I" unchanged (legacy rule)
+      if (keepI && core === "I") return core;
+      if (keepI && core === "i") return core;
+
+      const style = detectCaseStyle(core);
+      const lowerCore = core.toLowerCase();
+
+      const cluster = initialClusterLower(lowerCore);
+
+      let outLower;
+      if (cluster.length === 0) {
+        // vowel-start
+        outLower = lowerCore + "lay";
+      } else {
+        outLower = cluster + "ala" + lowerCore + cluster + "ay";
+      }
+
+      return applyCaseStyle(outLower, style);
+    }
+
+    function translateTextALAAY(text, keepI) {
+      // Tokenize by whitespace while preserving whitespace exactly
+      const parts = text.split(/(\s+)/);
+
+      return parts.map(part => {
+        if (/^\s+$/.test(part) || part === "") return part;
+
+        // Attempt to split punctuation/core/trailing
+        const s = splitPunctuation(part);
+        if (!s) return part; // leave unchanged if it doesn't fit pattern
+
+        const translated = translateWordALAAY(s.core, keepI);
+        return s.lead + translated + s.trail;
+      }).join("");
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 900);
+    }
+
+    // UI wiring
+    const input = document.getElementById("input");
+    const output = document.getElementById("output");
+    const keepI = document.getElementById("keepI");
+
+    document.getElementById("btnTranslate").addEventListener("click", () => {
+      output.value = translateTextALAAY(input.value, keepI.checked);
+    });
+
+    document.getElementById("btnSwap").addEventListener("click", () => {
+      const a = input.value;
+      input.value = output.value;
+      output.value = a;
+    });
+
+    document.getElementById("btnClear").addEventListener("click", () => {
+      input.value = "";
+      output.value = "";
+      input.focus();
+    });
+
+    document.getElementById("btnCopy").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(output.value || "");
+        showToast("Copied output");
+      } catch {
+        // fallback
+        output.select();
+        document.execCommand("copy");
+        showToast("Copied output");
+      }
+    });
+
+    document.getElementById("btnExample1").addEventListener("click", () => {
+      input.value = "The boy is playing basketball.";
+      output.value = translateTextALAAY(input.value, keepI.checked);
+    });
+
+    document.getElementById("btnExample2").addEventListener("click", () => {
+      input.value = "Three schools, yellow bikes, and a quick fox!";
+      output.value = translateTextALAAY(input.value, keepI.checked);
+    });
+
+    // Live translate (nice UX): update output as you type
+    let timer = null;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        output.value = translateTextALAAY(input.value, keepI.checked);
+      }, 120);
+    });
+    keepI.addEventListener("change", () => {
+      output.value = translateTextALAAY(input.value, keepI.checked);
+    });
+  </script>
 </body>
 </html>
